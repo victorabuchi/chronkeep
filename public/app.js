@@ -1,0 +1,416 @@
+(() => {
+const HH = 56; // pixels per hour: keep in sync with --hh in app.css
+const REM = [[0, 'At time'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [60, '1 hour'], [180, '3 hours'], [720, '12 hours'], [1440, '1 day'], [2880, '2 days'], [4320, '3 days'], [10080, '1 week']];
+const FROM = [[525600, 'Right away'], [10080, '7 days before'], [4320, '3 days before'], [2880, '2 days before'], [1440, '1 day before'], ['day', 'From the start of the due day'], [720, '12 hours before'], [360, '6 hours before'], [180, '3 hours before'], [60, '1 hour before'], [30, '30 min before']];
+const EVERY = [[5, '5 min'], [10, '10 min'], [15, '15 min'], [20, '20 min'], [30, '30 min'], [45, '45 min'], [60, '1 hour'], [120, '2 hours'], [180, '3 hours'], [360, '6 hours'], [720, '12 hours']];
+const everyLabel = (m) => (EVERY.find(([v]) => v === +m) || [0, `${m} min`])[1];
+const rank = (r) => (r.from === 'day' ? 1200 : +r.from);
+// The repeating-reminder rule in force at this moment: the latest one that has started.
+function activeRule(it, due, now) {
+  const left = (due - now) / 60000;
+  if (left <= 0) return null;
+  let best = null;
+  for (const r of it.nudges || []) { const from = r.from === 'day' ? (due - new Date(due).setHours(0, 0, 0, 0)) / 60000 : +r.from; if (left <= from && (!best || from < best.from)) best = { from, every: +r.every }; }
+  return best;
+}
+const KIND = { assignment: 'Assignment', event: 'Event', todo: 'To-do' };
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const day = (s) => new Date(s + 'T00:00');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const api = async (m, u, b) => (await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined })).json();
+const store = (k, v) => { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+
+const DEF = { name: 'ChronKeep', userName: '', accent: '#3b5bdb', theme: 'auto', weekStart: 1, showWeekends: true, dayStart: 7, dayEnd: 22, dueTime: '23:59', nagHours: 6, digestHour: 8, reminderDefaults: { assignment: [4320, 1440, 180, 30], event: [10], todo: [0] }, nudgeDefaults: { assignment: [{ from: 'day', every: 60 }, { from: 60, every: 10 }], event: [], todo: [] }, categories: [], notifyMac: true, notifyPhone: true, ntfyTopic: '' };
+// Whatever the server sends, the page always has every setting it needs.
+const norm = (x) => ({ ...DEF, ...x, reminderDefaults: { ...DEF.reminderDefaults, ...(x && x.reminderDefaults) }, nudgeDefaults: { ...DEF.nudgeDefaults, ...(x && x.nudgeDefaults) }, categories: (x && x.categories) || [] });
+let S = norm({}), items = [], notepad = { html: '', at: null };
+let page = load('planner:page') === 'tasks' ? 'tasks' : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', q = '', showDone = false, autoscroll = true;
+
+const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
+const vis = (it) => (typeF === 'all' || it.type === typeF) && (!q || `${it.title} ${it.notes} ${it.category}`.toLowerCase().includes(q));
+const hm = (t) => t;
+
+function occurs(it, d) {
+  if (!it.date) return false;
+  const s = day(it.date), dd = day(ymd(d));
+  if (dd < s) return false;
+  if (it.repeat === 'daily') return true;
+  if (it.repeat === 'weekly') return dd.getDay() === s.getDay();
+  if (it.repeat === 'monthly') return dd.getDate() === s.getDate();
+  return ymd(dd) === it.date;
+}
+const rep = (it) => it.repeat && it.repeat !== 'none';
+const isDone = (it, d) => (rep(it) ? (it.doneOn || []).includes(ymd(d)) : !!it.done);
+const dueAt = (it, d) => { const [h, m] = (it.time || (it.type === 'event' ? '00:00' : S.dueTime || '23:59')).split(':').map(Number); const x = new Date(d); x.setHours(h, m, 0, 0); return x; };
+
+async function toggle(id, dateStr) {
+  const it = items.find((x) => x.id === id);
+  if (!it) return;
+  if (!rep(it)) it.done = !it.done;
+  else { const a = it.doneOn || []; it.doneOn = a.includes(dateStr) ? a.filter((x) => x !== dateStr) : [...a, dateStr]; }
+  render();
+  await api('PUT', '/api/items/' + id, { done: it.done, doneOn: it.doneOn });
+}
+
+// ---------------------------------------------------------------- theme
+function applyTheme() {
+  document.documentElement.dataset.theme = S.theme;
+  const r = document.documentElement.style;
+  r.setProperty('--accent', S.accent);
+  $('brand').textContent = S.name;
+  $('userName').textContent = S.userName || 'Me';
+  $('initials').textContent = (S.userName || S.name || 'M').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+// ---------------------------------------------------------------- calendar
+const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DOWL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function weekDays() {
+  const start = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() - ((cur.getDay() - S.weekStart + 7) % 7));
+  return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)).filter((d) => S.showWeekends || (d.getDay() !== 0 && d.getDay() !== 6));
+}
+
+function title(days) {
+  if (view === 'month') return `${MON[cur.getMonth()]} ${cur.getFullYear()}`;
+  if (view === 'day') return `${DOWL[cur.getDay()]}, ${MON[cur.getMonth()]} ${cur.getDate()}, ${cur.getFullYear()}`;
+  const a = days[0], b = days[days.length - 1];
+  return a.getMonth() === b.getMonth() ? `${MON[a.getMonth()]} ${a.getDate()} – ${b.getDate()}, ${b.getFullYear()}` : `${MON[a.getMonth()].slice(0, 3)} ${a.getDate()} – ${MON[b.getMonth()].slice(0, 3)} ${b.getDate()}, ${b.getFullYear()}`;
+}
+
+function chip(it, d, month) {
+  const done = isDone(it, d), c = color(it.category), task = it.type !== 'event';
+  const late = task && !done && dueAt(it, d) < new Date();
+  return `<div class="chip ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${ymd(d)}" style="--c:${c}" title="${esc(it.title)}">${task ? `<button type="button" class="tick ${done ? 'on' : ''}" data-tick aria-label="Tick off"></button>` : ''}<span class="nm">${esc(it.title)}</span>${it.time ? `<span class="tm">${it.time}</span>` : ''}</div>`;
+}
+
+// Overlapping events share the column width.
+function lanes(list) {
+  list.sort((a, b) => a.s - b.s || a.e - b.e);
+  let group = [], gEnd = 0;
+  const flush = () => { const n = Math.max(0, ...group.map((g) => g.lane)) + 1; group.forEach((g) => (g.n = n)); group = []; gEnd = 0; };
+  for (const ev of list) {
+    if (group.length && ev.s >= gEnd) flush();
+    const used = group.filter((g) => g.e > ev.s).map((g) => g.lane);
+    let l = 0; while (used.includes(l)) l++;
+    ev.lane = l; group.push(ev); gEnd = Math.max(gEnd, ev.e);
+  }
+  flush();
+  return list;
+}
+
+function renderGrid(days) {
+  const n = days.length, rows = S.dayEnd - S.dayStart, top0 = S.dayStart * 60, now = new Date(), todayS = ymd(now);
+  let head = `<div class="dhead corner"></div>`, due = `<div class="due lab">DUE</div>`, cols = '';
+  for (const d of days) {
+    const t = ymd(d) === todayS;
+    head += `<div class="dhead ${t ? 'today' : ''}"><span class="dw">${DOW[d.getDay()]}</span><span class="dn">${d.getDate()}</span></div>`;
+    const dayItems = items.filter((it) => vis(it) && occurs(it, d));
+    const timed = [], dueList = [];
+    for (const it of dayItems) {
+      if (it.type === 'event' && it.time) {
+        const [h, m] = it.time.split(':').map(Number), s = h * 60 + m;
+        const [eh, em] = (it.endTime || '').split(':').map(Number);
+        const e = it.endTime ? Math.max(s + 15, eh * 60 + em) : s + 60;
+        if (e <= top0 || s >= S.dayEnd * 60) dueList.push(it); else timed.push({ it, s: Math.max(s, top0), e: Math.min(e, S.dayEnd * 60) });
+      } else dueList.push(it);
+    }
+    dueList.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+    due += `<div class="due ${t ? 'today' : ''}">${dueList.map((it) => chip(it, d)).join('')}</div>`;
+    let evs = lanes(timed).map((ev) => {
+      const c = color(ev.it.category), w = 100 / ev.n;
+      return `<div class="ev" data-id="${ev.it.id}" data-d="${ymd(d)}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${ev.it.time}${ev.it.endTime ? ' - ' + ev.it.endTime : ''}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}</div>`;
+    }).join('');
+    if (t) { const m = now.getHours() * 60 + now.getMinutes(); if (m >= top0 && m <= S.dayEnd * 60) evs += `<div class="nowline" style="top:${((m - top0) / 60) * HH}px"></div>`; }
+    cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
+  }
+  const gut = Array.from({ length: rows }, (_, i) => `<span style="top:${i * HH + (i ? 0 : 2)}px">${S.dayStart + i}:00</span>`).join('');
+  return `<div class="stick"><div class="cols" style="--n:${n}">${head}</div><div class="cols" style="--n:${n}">${due}</div></div><div class="cols" style="--n:${n};--rows:${rows}"><div class="gut">${gut}</div>${cols}</div>`;
+}
+
+function renderMonth() {
+  const first = new Date(cur.getFullYear(), cur.getMonth(), 1);
+  const start = new Date(first.getFullYear(), first.getMonth(), 1 - ((first.getDay() - S.weekStart + 7) % 7));
+  const weeks = Math.ceil((((first.getDay() - S.weekStart + 7) % 7) + new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate()) / 7);
+  let h = `<div class="month" style="grid-template-rows:auto repeat(${weeks},minmax(104px,1fr))">`;
+  for (let i = 0; i < 7; i++) h += `<div class="mh">${DOW[(i + +S.weekStart) % 7]}</div>`;
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const list = items.filter((it) => vis(it) && occurs(it, d)).sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+    h += `<div class="mday ${d.getMonth() !== cur.getMonth() ? 'other' : ''} ${ymd(d) === ymd(new Date()) ? 'today' : ''}" data-go="${ymd(d)}"><span class="n">${d.getDate()}</span>${list.slice(0, 4).map((it) => chip(it, d)).join('')}${list.length > 4 ? `<span class="more">+${list.length - 4} more</span>` : ''}</div>`;
+  }
+  return h + '</div>';
+}
+
+function renderCal() {
+  const days = view === 'week' ? weekDays() : [cur];
+  $('ctitle').textContent = title(days);
+  const wk = (() => { const t = new Date(Date.UTC(days[0].getFullYear(), days[0].getMonth(), days[0].getDate() + 3)); const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y) / 86400000 + 1 - ((t.getUTCDay() + 6) % 7) + 3) / 7); })();
+  $('eyebrow').textContent = view === 'week' ? `Week ${wk}` : view === 'day' ? 'Day' : 'Month';
+  const box = $('calscroll'), keep = box.scrollTop;
+  box.innerHTML = view === 'month' ? renderMonth() : renderGrid(days);
+  document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === view));
+  if (view !== 'month' && autoscroll) {
+    const m = new Date().getHours() * 60 + new Date().getMinutes();
+    box.scrollTop = days.some((d) => ymd(d) === ymd(new Date())) ? Math.max(0, ((m - S.dayStart * 60) / 60) * HH - box.clientHeight * 0.4) : 0;
+  } else box.scrollTop = keep;
+  autoscroll = false;
+}
+
+// ---------------------------------------------------------------- tasks
+function nextOcc(it) {
+  if (!rep(it)) return it.date ? day(it.date) : null;
+  for (let i = 0; i < 400; i++) {
+    const d = new Date(); d.setDate(d.getDate() + i); d.setHours(0, 0, 0, 0);
+    if (occurs(it, d) && !isDone(it, d)) return d;
+  }
+  return null;
+}
+
+function rel(due) {
+  const ms = due - new Date(), a = Math.abs(ms), min = Math.round(a / 60000), h = Math.round(a / 3600000), dd = Math.round(a / 86400000);
+  const t = min < 60 ? `${min} min` : h < 24 ? `${h} h` : `${dd} day${dd === 1 ? '' : 's'}`;
+  return ms < 0 ? [`${t} overdue`, 'late'] : [`in ${t}`, h < 24 ? 'soon' : 'ok'];
+}
+
+function taskRow(it, d) {
+  const done = d ? isDone(it, d) : it.done, c = color(it.category);
+  const meta = [];
+  meta.push(`<span class="kind">${KIND[it.type]}</span>`);
+  if (it.category) meta.push(`<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>`);
+  if (d) {
+    const due = dueAt(it, d);
+    meta.push(`<span>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${it.time ? ', ' + it.time : ''}</span>`);
+    if (!done) { const [t, k] = rel(due); meta.push(`<span class="pill ${k}">${t}</span>`); }
+  }
+  if (d && !done && (it.nudges || []).length) { const r = activeRule(it, dueAt(it, d), new Date()); if (r) meta.push(`<span class="pill nudge" title="Repeating reminder in force">🔔 every ${everyLabel(r.every)}</span>`); }
+  if (rep(it)) meta.push('<span>↻ ' + it.repeat + '</span>');
+  const late = d && !done && dueAt(it, d) < new Date();
+  return `<div class="trow ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${d ? ymd(d) : ''}"><button type="button" class="circle ${done ? 'on' : ''}" data-tick aria-label="Tick off"></button><div class="tx"><div class="ti">${esc(it.title)}</div><div class="me">${meta.join('')}</div></div></div>`;
+}
+
+function renderTasks() {
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const open = [], doneL = [];
+  for (const it of items) {
+    if (it.type === 'event' || !vis(it) || (typeF === 'event')) continue;
+    const d = nextOcc(it);
+    if (!rep(it) && it.done) doneL.push([it, d]); else open.push([it, d]);
+  }
+  const key = ([it, d]) => (d ? dueAt(it, d).getTime() : Infinity);
+  open.sort((a, b) => key(a) - key(b));
+  const B = { Overdue: [], Today: [], Tomorrow: [], 'This week': [], Later: [], 'No date': [] };
+  for (const o of open) {
+    const [it, d] = o;
+    if (!d) B['No date'].push(o);
+    else if (dueAt(it, d) < now) B.Overdue.push(o);
+    else { const diff = Math.round((d - today) / 86400000); (diff === 0 ? B.Today : diff === 1 ? B.Tomorrow : diff <= 7 ? B['This week'] : B.Later).push(o); }
+  }
+  let h = '';
+  for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="gcard ${name === 'Overdue' ? 'red' : ''}"><div class="grp ${name === 'Overdue' ? 'red' : ''}"><span>${name}</span><span>${list.length}</span></div>` + list.map(([it, d]) => taskRow(it, d)).join('') + '</section>';
+  if (!open.length) h += '<div class="empty">Nothing left to do.</div>';
+  if (doneL.length) {
+    h += `<button class="showdone" id="showDone">${showDone ? 'Hide' : 'Show'} ${doneL.length} completed</button>`;
+    if (showDone) h += `<section class="gcard"><div class="grp"><span>Completed</span><span>${doneL.length}</span></div>` + doneL.reverse().map(([it, d]) => taskRow(it, d)).join('') + '</section>';
+  }
+  $('tlist').innerHTML = h;
+  $('tsub').textContent = `${open.length} open${B.Overdue.length ? ` · ${B.Overdue.length} overdue` : ''}`;
+  const urgent = B.Overdue.length + B.Today.length;
+  $('badge').hidden = !urgent; $('badge').textContent = urgent;
+  $('badge').style.background = B.Overdue.length ? '#ff4d4f' : '#f59e0b';
+  document.title = `${urgent ? `(${urgent}) ` : ''}${S.name}`;
+}
+
+function render() { applyTheme(); renderCal(); renderTasks(); }
+
+// ---------------------------------------------------------------- repeating reminders editor
+function nudgeEditor(box, rules, onChange) {
+  const draw = () => {
+    rules.sort((a, b) => rank(b) - rank(a));
+    const opt = (list, cur) => list.map(([v, l]) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${l}</option>`).join('');
+    box.innerHTML = `<div class="nud">${rules.map((r, i) => `<div class="nrow"><select data-i="${i}" data-k="from" aria-label="Start">${opt(FROM, r.from)}</select><span>every</span><select data-i="${i}" data-k="every" aria-label="Interval">${opt(EVERY.some(([v]) => v === +r.every) ? EVERY : [...EVERY, [+r.every, `${r.every} min`]], r.every)}</select><button type="button" class="nx" data-x="${i}" aria-label="Remove">✕</button></div>`).join('')}<button type="button" class="btn ghost sm" data-add>+ Add a repeating reminder</button></div>`;
+    box.querySelectorAll('select').forEach((el) => (el.onchange = () => { const r = rules[el.dataset.i]; r[el.dataset.k] = el.dataset.k === 'from' ? (el.value === 'day' ? 'day' : +el.value) : +el.value; onChange?.(); draw(); }));
+    box.querySelectorAll('[data-x]').forEach((el) => (el.onclick = () => { rules.splice(el.dataset.x, 1); onChange?.(); draw(); }));
+    box.querySelector('[data-add]').onclick = () => { rules.push({ from: 525600, every: 30 }); onChange?.(); draw(); };
+  };
+  draw();
+}
+
+// ---------------------------------------------------------------- pages
+function setPage(p) {
+  page = p; store('planner:page', p);
+  $('main').classList.toggle('tpage', p === 'tasks');
+  $('tasks').classList.toggle('full', p === 'tasks');
+  $('railCal').classList.toggle('on', p === 'cal');
+  $('navTasks').classList.toggle('on', p === 'tasks');
+  if (p === 'cal') { autoscroll = true; renderCal(); }
+}
+
+// ---------------------------------------------------------------- item form
+let editing = null, fType = 'assignment', fRem = [], fNud = [], remTouched = false;
+function chipSet(box, selected, onChange) {
+  const draw = () => {
+    box.innerHTML = REM.map(([m, l]) => `<button type="button" data-m="${m}" class="${selected.includes(m) ? 'on' : ''}">${l}</button>`).join('');
+    box.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+      const m = +b.dataset.m, i = selected.indexOf(m);
+      i < 0 ? selected.push(m) : selected.splice(i, 1);
+      onChange?.(); draw();
+    }));
+  };
+  draw();
+}
+function setType(t, fresh) {
+  fType = t;
+  document.querySelectorAll('#fType button').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
+  $('fDateL').textContent = t === 'assignment' ? 'Due date' : t === 'event' ? 'Date' : 'Date (optional)';
+  $('fTimeL').textContent = t === 'assignment' ? 'Due time' : t === 'event' ? 'Start time' : 'Time (optional)';
+  $('fEndWrap').hidden = t !== 'event';
+  if (fresh && !remTouched) { fRem = [...(S.reminderDefaults[t] || [])]; chipSet($('fRem'), fRem, () => (remTouched = true)); fNud = (S.nudgeDefaults[t] || []).map((r) => ({ ...r })); nudgeEditor($('fNud'), fNud, () => (remTouched = true)); }
+  if (fresh && t === 'assignment' && !$('fTime').value && !editing) $('fTime').value = S.dueTime;
+}
+function openForm(it, preset = {}) {
+  editing = it; remTouched = !!it;
+  $('fHead').textContent = it ? 'Edit' : 'New';
+  $('fCat').innerHTML = '<option value="">None</option>' + S.categories.map((c) => `<option>${esc(c.name)}</option>`).join('');
+  $('fTitle').value = it?.title || ''; $('fCat').value = it?.category || preset.category || '';
+  $('fDate').value = it ? it.date : preset.date || ymd(cur); $('fTime').value = it ? it.time || '' : preset.time || '';
+  $('fEnd').value = it?.endTime || ''; $('fRepeat').value = it?.repeat || 'none'; $('fNotes').value = it?.notes || '';
+  fRem = it ? [...(it.reminders || [])] : [];
+  chipSet($('fRem'), fRem, () => (remTouched = true));
+  fNud = it ? (it.nudges || []).map((r) => ({ ...r })) : [];
+  nudgeEditor($('fNud'), fNud, () => (remTouched = true));
+  setType(it ? it.type : preset.type || 'assignment', !it);
+  $('fDel').hidden = !it;
+  $('dlg').showModal(); $('fTitle').focus();
+}
+$('fType').onclick = (e) => { const b = e.target.closest('button'); if (b) setType(b.dataset.t, true); };
+$('form').onsubmit = async () => {
+  let time = $('fTime').value;
+  if (fType === 'assignment' && $('fDate').value && !time) time = S.dueTime;
+  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, notes: $('fNotes').value };
+  if (editing) Object.assign(editing, await api('PUT', '/api/items/' + editing.id, body));
+  else items.push(await api('POST', '/api/items', body));
+  render();
+};
+$('fCancel').onclick = () => $('dlg').close();
+$('fDel').onclick = async () => {
+  if (!confirm(`Delete "${editing.title}"?`)) return;
+  await api('DELETE', '/api/items/' + editing.id); items = items.filter((x) => x !== editing); $('dlg').close(); render();
+};
+
+// ---------------------------------------------------------------- settings
+let cats = [], setA, setE, setT, nudA, nudE, nudT;
+function drawCats() {
+  $('sCats').innerHTML = cats.map((c, i) => `<div class="catrow"><input type="color" value="${c.color}" data-i="${i}" data-k="color"><input type="text" value="${esc(c.name)}" data-i="${i}" data-k="name"><button type="button" class="btn ghost" data-x="${i}">✕</button></div>`).join('');
+  $('sCats').querySelectorAll('input').forEach((el) => (el.oninput = () => (cats[el.dataset.i][el.dataset.k] = el.value)));
+  $('sCats').querySelectorAll('[data-x]').forEach((el) => (el.onclick = () => { cats.splice(el.dataset.x, 1); drawCats(); }));
+}
+$('mSettings').onclick = () => {
+  $('userMenu').hidden = true;
+  $('sName').value = S.name; $('sUser').value = S.userName; $('sAccent').value = S.accent; $('sHex').value = S.accent; $('sHex').classList.remove('bad'); $('sTheme').value = S.theme;
+  $('sWeek').value = S.weekStart; $('sDayStart').value = S.dayStart; $('sDayEnd').value = S.dayEnd; $('sWeekend').checked = S.showWeekends; $('sDue').value = S.dueTime;
+  $('sNag').value = S.nagHours; $('sDigest').value = S.digestHour;
+  $('sMac').checked = S.notifyMac; $('sPhone').checked = S.notifyPhone; $('sTopic').value = S.ntfyTopic;
+  setA = [...S.reminderDefaults.assignment]; setE = [...S.reminderDefaults.event]; setT = [...S.reminderDefaults.todo];
+  chipSet($('sRemA'), setA); chipSet($('sRemE'), setE); chipSet($('sRemT'), setT);
+  const cp = (a) => (a || []).map((r) => ({ ...r }));
+  nudA = cp(S.nudgeDefaults.assignment); nudE = cp(S.nudgeDefaults.event); nudT = cp(S.nudgeDefaults.todo);
+  nudgeEditor($('sNudA'), nudA); nudgeEditor($('sNudE'), nudE); nudgeEditor($('sNudT'), nudT);
+  cats = S.categories.map((c) => ({ ...c })); drawCats();
+  $('sdlg').showModal();
+};
+// Type a hex code and the colour loads at once; nothing is saved until Save.
+const ACCENT = '#3b5bdb';
+const hexOf = (v) => { v = v.trim().replace(/^#?/, '#').toLowerCase(); if (/^#[0-9a-f]{3}$/.test(v)) v = '#' + [...v.slice(1)].map((c) => c + c).join(''); return /^#[0-9a-f]{6}$/.test(v) ? v : null; };
+const preview = (hex) => document.documentElement.style.setProperty('--accent', hex);
+$('sHex').oninput = (e) => { const h = hexOf(e.target.value); e.target.classList.toggle('bad', !h && e.target.value.trim() !== ''); if (h) { $('sAccent').value = h; preview(h); } };
+$('sHex').onblur = (e) => { const h = hexOf(e.target.value); e.target.value = h || $('sAccent').value; e.target.classList.remove('bad'); };
+$('sAccent').oninput = (e) => { $('sHex').value = e.target.value; $('sHex').classList.remove('bad'); preview(e.target.value); };
+$('sHexReset').onclick = () => { $('sHex').value = ACCENT; $('sAccent').value = ACCENT; $('sHex').classList.remove('bad'); preview(ACCENT); };
+// Closing without saving puts the saved colour back.
+$('sdlg').addEventListener('close', () => preview(S.accent));
+$('addCat').onclick = () => { cats.push({ name: 'New course', color: '#888888' }); drawCats(); };
+$('sCancel').onclick = () => $('sdlg').close();
+async function saveSettings() {
+  S = norm(await api('PUT', '/api/settings', {
+    name: $('sName').value || 'My Planner', userName: $('sUser').value, accent: hexOf($('sHex').value) || $('sAccent').value, theme: $('sTheme').value,
+    weekStart: +$('sWeek').value, dayStart: Math.min(+$('sDayStart').value, 22), dayEnd: Math.max(+$('sDayEnd').value, +$('sDayStart').value + 1), showWeekends: $('sWeekend').checked, dueTime: $('sDue').value || '23:59',
+    nagHours: +$('sNag').value, digestHour: +$('sDigest').value, notifyMac: $('sMac').checked, notifyPhone: $('sPhone').checked, ntfyTopic: $('sTopic').value.trim(),
+    reminderDefaults: { assignment: setA, event: setE, todo: setT }, nudgeDefaults: { assignment: nudA, event: nudE, todo: nudT }, categories: cats.filter((c) => c.name.trim()),
+  }));
+  render();
+}
+$('sSave').onclick = async () => { await saveSettings(); $('sdlg').close(); };
+$('sTest').onclick = async () => { await saveSettings(); api('POST', '/api/test'); };
+$('mTest').onclick = () => { $('userMenu').hidden = true; api('POST', '/api/test'); };
+
+// ---------------------------------------------------------------- events
+$('calscroll').addEventListener('click', (e) => {
+  const tick = e.target.closest('[data-tick]');
+  const el = e.target.closest('[data-id]');
+  if (tick && el) return toggle(el.dataset.id, el.dataset.d);
+  if (el) return openForm(items.find((x) => x.id === el.dataset.id));
+  const col = e.target.closest('[data-col]');
+  if (col && e.target === col) {
+    const mins = Math.floor(((e.offsetY / HH) * 60 + S.dayStart * 60) / 30) * 30;
+    return openForm(null, { date: col.dataset.col, time: `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`, type: 'event' });
+  }
+  const go = e.target.closest('[data-go]');
+  if (go) { cur = day(go.dataset.go); view = 'day'; store('planner:view', view); autoscroll = true; render(); }
+});
+$('tlist').addEventListener('click', (e) => {
+  if (e.target.id === 'showDone') { showDone = !showDone; return renderTasks(); }
+  const row = e.target.closest('.trow');
+  if (!row) return;
+  if (e.target.closest('[data-tick]')) return toggle(row.dataset.id, row.dataset.d);
+  openForm(items.find((x) => x.id === row.dataset.id));
+});
+$('quick').onsubmit = async (e) => {
+  e.preventDefault();
+  const title = $('qTitle').value.trim();
+  if (!title) return;
+  const type = $('qType').value, date = $('qDate').value;
+  items.push(await api('POST', '/api/items', { type, title, date, time: $('qTime').value || (type === 'assignment' && date ? S.dueTime : ''), reminders: date ? [...S.reminderDefaults[type]] : [], nudges: date ? (S.nudgeDefaults[type] || []).map((r) => ({ ...r })) : [] }));
+  $('qTitle').value = ''; $('qTime').value = ''; render(); $('qTitle').focus();
+};
+$('btnAdd').onclick = () => openForm(null);
+const step = (n) => {
+  if (view === 'month') cur = new Date(cur.getFullYear(), cur.getMonth() + n, 1);
+  else cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + n * (view === 'week' ? 7 : 1));
+  autoscroll = true; render();
+};
+$('prev').onclick = () => step(-1); $('next').onclick = () => step(1);
+const goToday = () => { cur = new Date(); autoscroll = true; render(); };
+$('todayBtn').onclick = goToday;
+$('viewSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; store('planner:view', view); autoscroll = true; render(); } };
+document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); render(); }));
+$('q').oninput = (e) => { q = e.target.value.trim().toLowerCase(); render(); };
+$('navTasks').onclick = () => setPage('tasks');
+$('railCal').onclick = () => setPage('cal');
+$('railSet').onclick = () => $('mSettings').click();
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open]') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
+  if (e.key === '/') { e.preventDefault(); $('q').focus(); }
+  if (e.key === 'n') { e.preventDefault(); openForm(null); }
+});
+$('btnBell').onclick = () => setPage('tasks');
+$('userBtn').onclick = (e) => { e.stopPropagation(); $('userMenu').hidden = !$('userMenu').hidden; };
+document.addEventListener('click', () => ($('userMenu').hidden = true));
+const noteBtn = () => $('btnNote').setAttribute('aria-pressed', PlannerNote.isOpen());
+$('btnNote').onclick = () => { PlannerNote.toggle(notepad); noteBtn(); };
+document.addEventListener('note:closed', noteBtn);
+
+// ---------------------------------------------------------------- start
+(async () => {
+  const st = await api('GET', '/api/state');
+  S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
+  setPage(page);
+  render();
+  if (PlannerNote.wasOpen()) { PlannerNote.open(notepad); noteBtn(); }
+  setInterval(() => { if (!document.querySelector('dialog[open]')) { renderCal(); renderTasks(); } }, 60000);
+})();
+})();

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ChronKeep</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#3b5bdb">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="note.css">
+</head>
+<body>
+<header class="top">
+  <span class="mark"><img src="icon-192.png" alt="" width="32" height="32"></span>
+  <b class="brand" id="brand">ChronKeep</b>
+  <label class="sbox"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search" autocomplete="off"><kbd>/</kbd></label>
+  <div class="topr">
+    <button class="ibtn" id="btnNote" aria-label="Note" aria-pressed="false" title="Note"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></button>
+    <button class="ibtn" id="btnBell" aria-label="Due soon" title="Overdue and due today"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="badge" id="badge" hidden>0</span></button>
+    <button class="btn" id="btnAdd"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New</button>
+    <div class="popwrap">
+      <button class="avatar" id="userBtn" aria-label="Account"><span id="initials">V</span></button>
+      <div class="menu" id="userMenu" hidden>
+        <div class="who"><b id="userName">Me</b><small>Personal planner</small></div>
+        <button id="mSettings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Customize</button>
+        <button id="mTest"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg>Send test notification</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Main">
+    <button class="ritem on" id="railCal" aria-label="Calendar"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
+    <button class="ritem" id="navTasks" aria-label="Tasks"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="7" r="1.6"/><circle cx="5" cy="17" r="1.6"/><path d="M10 7h10M10 17h10"/></svg><span>Tasks</span></button>
+    <i class="rgrow"></i>
+    <button class="ritem" id="railSet" aria-label="Customize"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Customize</span></button>
+  </nav>
+
+  <main class="main" id="main">
+    <section class="cal">
+      <div class="head">
+        <div class="htitle"><small class="eyebrow" id="eyebrow"></small><h1 id="ctitle"></h1></div>
+        <div class="hctl">
+          <div class="arrows"><button class="ibtn" id="prev" aria-label="Previous"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button><button class="ibtn" id="next" aria-label="Next"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>
+          <button class="pillbtn" id="todayBtn">Today</button>
+          <div class="segment" data-typetabs><button data-f="all" data-on="true">All</button><button data-f="assignment">Assignments</button><button data-f="event">Events</button><button data-f="todo">To-do</button></div>
+          <div class="segment" id="viewSeg"><button data-v="month">Month</button><button data-v="week">Week</button><button data-v="day">Day</button></div>
+        </div>
+      </div>
+      <div class="calcard"><div class="calscroll" id="calscroll"></div></div>
+    </section>
+
+    <aside class="tasks" id="tasks">
+      <header>
+        <div class="thead"><small class="eyebrow tonly">Everything you owe</small><h2>Tasks</h2></div>
+        <div class="thctl"><div class="segment tonly" data-typetabs><button data-f="all" data-on="true">All</button><button data-f="assignment">Assignments</button><button data-f="todo">To-do</button></div><span class="sub" id="tsub"></span></div>
+      </header>
+      <form class="quick" id="quick">
+        <input class="qin" id="qTitle" placeholder="Add a task, press Enter" autocomplete="off">
+        <select id="qType"><option value="assignment">Assignment</option><option value="todo">To-do</option></select>
+        <input type="date" id="qDate">
+        <input type="time" id="qTime" class="tonly" title="Time (optional)">
+        <button class="btn tonly qadd">Add</button>
+      </form>
+      <div class="tlist" id="tlist"></div>
+    </aside>
+  </main>
+</div>
+
+<dialog id="dlg"><form id="form" method="dialog">
+  <h3 id="fHead">New</h3>
+  <div class="segment wide" id="fType"><button type="button" data-t="assignment">Assignment</button><button type="button" data-t="event">Event</button><button type="button" data-t="todo">To-do</button></div>
+  <label class="l">Title</label><input id="fTitle" required placeholder="e.g. Web Programming essay">
+  <label class="l">Course</label><select id="fCat"></select>
+  <div class="two"><div><label class="l" id="fDateL">Due date</label><input type="date" id="fDate"></div><div><label class="l" id="fTimeL">Due time</label><input type="time" id="fTime"></div></div>
+  <div id="fEndWrap" hidden><label class="l">End time</label><input type="time" id="fEnd"></div>
+  <label class="l">Remind me once</label><div class="chips" id="fRem"></div>
+  <label class="l">Keep reminding me until it is done</label><div id="fNud"></div>
+  <div class="two"><div><label class="l">Repeat</label><select id="fRepeat"><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div></div>
+  <label class="l">Notes</label><textarea id="fNotes" rows="2"></textarea>
+  <div class="actions"><button type="button" class="btn danger left" id="fDel">Delete</button><button type="button" class="btn ghost" id="fCancel">Cancel</button><button class="btn">Save</button></div>
+</form></dialog>
+
+<dialog id="sdlg"><div class="setgrid">
+  <h3>Customize</h3>
+  <div class="two"><div><label class="l">App name</label><input id="sName"></div><div><label class="l">Your name</label><input id="sUser"></div></div>
+  <label class="l">Accent colour</label>
+  <div class="hexrow"><input type="color" id="sAccent" aria-label="Pick a colour"><input id="sHex" placeholder="#3b5bdb" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour"><button type="button" class="btn ghost sm" id="sHexReset">Reset to cobalt</button></div>
+  <div class="two"><div><label class="l">Theme</label><select id="sTheme"><option value="auto">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></div><div><label class="l">Week starts</label><select id="sWeek"><option value="1">Monday</option><option value="0">Sunday</option></select></div></div>
+  <div class="two"><div><label class="l">Day starts (hour)</label><input type="number" id="sDayStart" min="0" max="23"></div><div><label class="l">Day ends (hour)</label><input type="number" id="sDayEnd" min="1" max="24"></div></div>
+  <label class="chk"><input type="checkbox" id="sWeekend"> Show Saturday and Sunday</label>
+
+  <h4>Reminders</h4>
+  <label class="l">Assignments with no time are due at</label><input type="time" id="sDue">
+  <label class="l">Default for assignments</label><div class="chips" id="sRemA"></div>
+  <label class="l">Default for events</label><div class="chips" id="sRemE"></div>
+  <label class="l">Default for to-dos</label><div class="chips" id="sRemT"></div>
+  <label class="l">Keep reminding: assignments</label><div id="sNudA"></div>
+  <label class="l">Keep reminding: events</label><div id="sNudE"></div>
+  <label class="l">Keep reminding: to-dos</label><div id="sNudT"></div>
+  <p class="hint">As the deadline gets closer, the latest rule that has started takes over. Example: "Right away, every 30 min" then "On the due day, every 10 min".</p>
+  <div class="two"><div><label class="l">Nag about overdue every (hours, 0 = off)</label><input type="number" id="sNag" min="0"></div><div><label class="l">Morning summary at (hour, -1 = off)</label><input type="number" id="sDigest" min="-1" max="23"></div></div>
+  <p class="hint">Overdue items keep sending notifications until you tick them off.</p>
+
+  <h4>Courses</h4><div id="sCats"></div><button type="button" class="btn ghost sm" id="addCat">+ Add course</button>
+
+  <h4>Notifications</h4>
+  <label class="chk"><input type="checkbox" id="sMac"> Mac desktop notifications</label>
+  <label class="chk"><input type="checkbox" id="sPhone"> Phone and other devices (ntfy)</label>
+  <label class="l">ntfy topic: subscribe to this in the ntfy app</label><input id="sTopic">
+</div>
+<div class="actions"><button type="button" class="btn ghost left" id="sTest">Send test</button><button type="button" class="btn ghost" id="sCancel">Cancel</button><button type="button" class="btn" id="sSave">Save</button></div></dialog>
+
+<script src="note.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
