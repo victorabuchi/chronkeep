@@ -228,3 +228,14 @@ dialog input:focus,dialog select:focus,dialog textarea:focus{border-color:var(--
 #sHex{flex:1;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;text-transform:lowercase}
 #sHex.bad{border-color:var(--neg)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--neg) 14%,transparent)!important}
 .setgrid:focus,#form:focus,dialog:focus,dialog:focus-visible{outline:none}
+
+/* search results */
+.swrap{position:relative;margin-left:14px}
+.swrap .sbox{margin-left:0}
+.sres{position:absolute;left:0;top:calc(100% + 6px);z-index:70;width:440px;max-width:90vw;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:0 18px 40px -16px #0006}
+.sr{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:none;text-align:left}
+.sr.on,.sr:hover{background:var(--soft)}
+.sr .st{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.sr .st.dn{text-decoration:line-through;color:var(--muted)}
+.sr .sm{flex:none;color:var(--muted);font-size:12px}
+.sempty{padding:14px;text-align:center;color:var(--muted)}

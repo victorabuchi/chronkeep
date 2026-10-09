@@ -27,10 +27,10 @@ const DEF = { name: 'ChronKeep', userName: '', accent: '#3b5bdb', theme: 'auto',
 // Whatever the server sends, the page always has every setting it needs.
 const norm = (x) => ({ ...DEF, ...x, reminderDefaults: { ...DEF.reminderDefaults, ...(x && x.reminderDefaults) }, nudgeDefaults: { ...DEF.nudgeDefaults, ...(x && x.nudgeDefaults) }, categories: (x && x.categories) || [] });
 let S = norm({}), items = [], notepad = { html: '', at: null };
-let page = load('planner:page') === 'tasks' ? 'tasks' : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', q = '', showDone = false, autoscroll = true;
+let page = load('planner:page') === 'tasks' ? 'tasks' : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
-const vis = (it) => (typeF === 'all' || it.type === typeF) && (!q || `${it.title} ${it.notes} ${it.category}`.toLowerCase().includes(q));
+const vis = (it) => typeF === 'all' || it.type === typeF;
 const hm = (t) => t;
 
 function occurs(it, d) {
@@ -388,7 +388,6 @@ const goToday = () => { cur = new Date(); autoscroll = true; render(); };
 $('todayBtn').onclick = goToday;
 $('viewSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; store('planner:view', view); autoscroll = true; render(); } };
 document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); render(); }));
-$('q').oninput = (e) => { q = e.target.value.trim().toLowerCase(); render(); };
 $('navTasks').onclick = () => setPage('tasks');
 $('railCal').onclick = () => setPage('cal');
 $('railSet').onclick = () => $('mSettings').click();
@@ -403,6 +402,40 @@ document.addEventListener('click', () => ($('userMenu').hidden = true));
 const noteBtn = () => $('btnNote').setAttribute('aria-pressed', PlannerNote.isOpen());
 $('btnNote').onclick = () => { PlannerNote.toggle(notepad); noteBtn(); };
 document.addEventListener('note:closed', noteBtn);
+
+// ---------------------------------------------------------------- search
+// Finds items on any date, not only the ones on screen.
+let sList = [], sIdx = 0;
+function drawSearch() {
+  const box = $('sres'), t = $('q').value.trim().toLowerCase();
+  if (!t) { box.hidden = true; return; }
+  const words = t.split(/\s+/), today = new Date().setHours(0, 0, 0, 0);
+  sList = items
+    .filter((it) => { const hay = `${it.title} ${it.notes} ${it.category} ${KIND[it.type]} ${it.date}`.toLowerCase(); return words.every((w) => hay.includes(w)); })
+    .sort((a, b) => (!!a.done - !!b.done) || Math.abs(day(a.date || '2100-01-01') - today) - Math.abs(day(b.date || '2100-01-01') - today))
+    .slice(0, 8);
+  sIdx = Math.min(sIdx, Math.max(0, sList.length - 1));
+  box.hidden = false;
+  box.innerHTML = sList.length ? sList.map((it, i) => {
+    const when = it.date ? `${DOW[day(it.date).getDay()]} ${day(it.date).getDate()} ${MON[day(it.date).getMonth()].slice(0, 3)}${it.time ? ', ' + it.time : ''}` : 'No date';
+    return `<button type="button" class="sr ${i === sIdx ? 'on' : ''}" data-i="${i}" role="option"><i class="dot" style="background:${color(it.category)}"></i><span class="st ${it.done ? 'dn' : ''}">${esc(it.title)}</span><span class="sm">${KIND[it.type]} · ${when}</span></button>`;
+  }).join('') : '<div class="sempty">No matches</div>';
+}
+function pickSearch(it) {
+  if (!it) return;
+  $('q').value = ''; $('sres').hidden = true; $('q').blur();
+  if (it.date) { cur = day(it.date); autoscroll = true; }
+  setPage('cal'); render(); openForm(it);
+}
+$('q').addEventListener('input', () => { sIdx = 0; drawSearch(); });
+$('q').addEventListener('focus', drawSearch);
+$('q').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sIdx = (sIdx + (e.key === 'ArrowDown' ? 1 : -1) + sList.length) % Math.max(1, sList.length); drawSearch(); }
+  else if (e.key === 'Enter') { e.preventDefault(); pickSearch(sList[sIdx]); }
+  else if (e.key === 'Escape') { $('q').value = ''; $('sres').hidden = true; $('q').blur(); }
+});
+$('sres').addEventListener('mousedown', (e) => { const b = e.target.closest('.sr'); if (b) { e.preventDefault(); pickSearch(sList[+b.dataset.i]); } });
+document.addEventListener('click', (e) => { if (!e.target.closest('.swrap')) $('sres').hidden = true; });
 
 // ---------------------------------------------------------------- start
 (async () => {
