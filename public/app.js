@@ -28,7 +28,7 @@ const DEF = { name: 'ChronKeep', userName: '', accent: '#3b5bdb', theme: 'auto',
 const norm = (x) => ({ ...DEF, ...x, reminderDefaults: { ...DEF.reminderDefaults, ...(x && x.reminderDefaults) }, nudgeDefaults: { ...DEF.nudgeDefaults, ...(x && x.nudgeDefaults) }, categories: (x && x.categories) || [] });
 let S = norm({}), items = [], notepad = { html: '', at: null };
 let P = { name: '', email: '', phone: '', photo: '' };
-let page = ['tasks', 'settings'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true;
+let page = ['tasks', 'settings', 'customize'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
 const vis = (it) => typeF === 'all' || it.type === typeF;
@@ -245,9 +245,13 @@ function nudgeEditor(box, rules, onChange) {
 
 // ---------------------------------------------------------------- pages
 function setPage(p) {
+  if (page === 'customize' && p !== 'customize') document.documentElement.style.setProperty('--accent', S.accent); // drop an unsaved colour preview
   page = p; store('planner:page', p);
   $('main').classList.toggle('tpage', p === 'tasks');
   $('main').classList.toggle('spage', p === 'settings');
+  $('main').classList.toggle('cpage', p === 'customize');
+  $('railSet').classList.toggle('on', p === 'customize');
+  if (p === 'customize') fillCustomize();
   $('railSettings').classList.toggle('on', p === 'settings');
   if (p === 'settings') fillProfile();
   $('tasks').classList.toggle('full', p === 'tasks');
@@ -315,10 +319,9 @@ function drawCats() {
   $('sCats').querySelectorAll('input').forEach((el) => (el.oninput = () => (cats[el.dataset.i][el.dataset.k] = el.value)));
   $('sCats').querySelectorAll('[data-x]').forEach((el) => (el.onclick = () => { cats.splice(el.dataset.x, 1); drawCats(); }));
 }
-$('mSettings').onclick = () => {
-  $('userMenu').hidden = true;
+function fillCustomize() {
   $('sName').value = S.name; $('sAccent').value = S.accent; $('sHex').value = S.accent; $('sHex').classList.remove('bad'); $('sTheme').value = S.theme;
-  $('sWeek').value = S.weekStart; $('sDayStart').value = S.dayStart; $('sDayEnd').value = S.dayEnd; $('sWeekend').checked = S.showWeekends; $('sDue').value = S.dueTime;
+  $('sWeek').value = S.weekStart; $('sDayStart').value = S.dayStart; $('sDayEnd').value = S.dayEnd; $('sWeekend').value = S.showWeekends ? '1' : '0'; $('sDue').value = S.dueTime;
   $('sNag').value = S.nagHours; $('sDigest').value = S.digestHour;
   $('sMac').checked = S.notifyMac; $('sPhone').checked = S.notifyPhone; $('sTopic').value = S.ntfyTopic;
   setA = [...S.reminderDefaults.assignment]; setE = [...S.reminderDefaults.event]; setT = [...S.reminderDefaults.todo];
@@ -327,8 +330,9 @@ $('mSettings').onclick = () => {
   nudA = cp(S.nudgeDefaults.assignment); nudE = cp(S.nudgeDefaults.event); nudT = cp(S.nudgeDefaults.todo);
   nudgeEditor($('sNudA'), nudA); nudgeEditor($('sNudE'), nudE); nudgeEditor($('sNudT'), nudT);
   cats = S.categories.map((c) => ({ ...c })); drawCats();
-  $('sdlg').showModal();
-};
+  $('customMsg').textContent = '';
+}
+$('mSettings').onclick = () => { $('userMenu').hidden = true; setPage('customize'); };
 // Type a hex code and the colour loads at once; nothing is saved until Save.
 const ACCENT = '#3b5bdb';
 const hexOf = (v) => { v = v.trim().replace(/^#?/, '#').toLowerCase(); if (/^#[0-9a-f]{3}$/.test(v)) v = '#' + [...v.slice(1)].map((c) => c + c).join(''); return /^#[0-9a-f]{6}$/.test(v) ? v : null; };
@@ -338,19 +342,18 @@ $('sHex').onblur = (e) => { const h = hexOf(e.target.value); e.target.value = h 
 $('sAccent').oninput = (e) => { $('sHex').value = e.target.value; $('sHex').classList.remove('bad'); preview(e.target.value); };
 $('sHexReset').onclick = () => { $('sHex').value = ACCENT; $('sAccent').value = ACCENT; $('sHex').classList.remove('bad'); preview(ACCENT); };
 // Closing without saving puts the saved colour back.
-$('sdlg').addEventListener('close', () => preview(S.accent));
 $('addCat').onclick = () => { cats.push({ name: 'New course', color: '#888888' }); drawCats(); };
-$('sCancel').onclick = () => $('sdlg').close();
+$('sCancel').onclick = () => { preview(S.accent); fillCustomize(); $('customMsg').textContent = 'Changes discarded'; setTimeout(() => ($('customMsg').textContent = ''), 2000); };
 async function saveSettings() {
   S = norm(await api('PUT', '/api/settings', {
     name: $('sName').value || 'ChronKeep', accent: hexOf($('sHex').value) || $('sAccent').value, theme: $('sTheme').value,
-    weekStart: +$('sWeek').value, dayStart: Math.min(+$('sDayStart').value, 22), dayEnd: Math.max(+$('sDayEnd').value, +$('sDayStart').value + 1), showWeekends: $('sWeekend').checked, dueTime: $('sDue').value || '23:59',
+    weekStart: +$('sWeek').value, dayStart: Math.min(+$('sDayStart').value, 22), dayEnd: Math.max(+$('sDayEnd').value, +$('sDayStart').value + 1), showWeekends: $('sWeekend').value === '1', dueTime: $('sDue').value || '23:59',
     nagHours: +$('sNag').value, digestHour: +$('sDigest').value, notifyMac: $('sMac').checked, notifyPhone: $('sPhone').checked, ntfyTopic: $('sTopic').value.trim(),
     reminderDefaults: { assignment: setA, event: setE, todo: setT }, nudgeDefaults: { assignment: nudA, event: nudE, todo: nudT }, categories: cats.filter((c) => c.name.trim()),
   }));
   render();
 }
-$('sSave').onclick = async () => { await saveSettings(); $('sdlg').close(); };
+$('sSave').onclick = async () => { await saveSettings(); $('customMsg').textContent = 'Saved'; setTimeout(() => ($('customMsg').textContent = ''), 2500); };
 $('sTest').onclick = async () => { await saveSettings(); api('POST', '/api/test'); };
 $('mTest').onclick = () => { $('userMenu').hidden = true; api('POST', '/api/test'); };
 

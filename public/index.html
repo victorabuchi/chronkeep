@@ -112,6 +112,63 @@
         </div>
       </div>
     </section>
+    <section class="settings" id="customize">
+      <div class="phead"><small class="eyebrow">Make it yours</small><h1>Customize</h1></div>
+      <div class="sgrid">
+        <div class="sstack">
+          <div class="scard">
+            <strong>Appearance</strong>
+            <label class="field">App name<input id="sName" maxlength="40"></label>
+            <div class="field">Accent colour
+              <div class="hexrow"><input type="color" id="sAccent" aria-label="Pick a colour"><input id="sHex" placeholder="#3b5bdb" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour"><button type="button" class="btn ghost sm" id="sHexReset">Reset to cobalt</button></div>
+            </div>
+            <label class="field">Theme<select id="sTheme"><option value="auto">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+          </div>
+          <div class="scard">
+            <strong>Calendar</strong>
+            <div class="two">
+              <label class="field">Week starts<select id="sWeek"><option value="1">Monday</option><option value="0">Sunday</option></select></label>
+              <label class="field">Show weekends<select id="sWeekend"><option value="1">Saturday and Sunday</option><option value="0">Weekdays only</option></select></label>
+            </div>
+            <div class="two">
+              <label class="field">Day starts (hour)<input type="number" id="sDayStart" min="0" max="23"></label>
+              <label class="field">Day ends (hour)<input type="number" id="sDayEnd" min="1" max="24"></label>
+            </div>
+          </div>
+          <div class="scard">
+            <strong>Courses</strong>
+            <p class="note">Colours your assignments and events by course or category.</p>
+            <div id="sCats"></div>
+            <button type="button" class="btn ghost sm" id="addCat">+ Add course</button>
+          </div>
+        </div>
+        <div class="sstack">
+          <div class="scard">
+            <strong>Reminders</strong>
+            <label class="field">Assignments with no time are due at<input type="time" id="sDue"></label>
+            <div class="field">One-off reminders for new assignments<div class="chips" id="sRemA"></div></div>
+            <div class="field">One-off reminders for new events<div class="chips" id="sRemE"></div></div>
+            <div class="field">One-off reminders for new to-dos<div class="chips" id="sRemT"></div></div>
+            <div class="field">Repeating reminders for new assignments<div id="sNudA"></div></div>
+            <div class="field">Repeating reminders for new events<div id="sNudE"></div></div>
+            <div class="field">Repeating reminders for new to-dos<div id="sNudT"></div></div>
+            <p class="note">As the deadline gets closer, the latest rule that has started takes over. Example: "Right away, every 30 min", then "From the start of the due day, every 10 min".</p>
+            <div class="two">
+              <label class="field">Nag when overdue, every (hours, 0 = off)<input type="number" id="sNag" min="0"></label>
+              <label class="field">Morning summary at (hour, -1 = off)<input type="number" id="sDigest" min="-1" max="23"></label>
+            </div>
+          </div>
+          <div class="scard">
+            <strong>Notifications</strong>
+            <label class="chk"><input type="checkbox" id="sMac"> Mac desktop notifications</label>
+            <label class="chk"><input type="checkbox" id="sPhone"> Phone and other devices (ntfy)</label>
+            <label class="field">ntfy topic: subscribe to this in the ntfy app<input id="sTopic" spellcheck="false"></label>
+            <button type="button" class="btn ghost sm" id="sTest">Send test notification</button>
+          </div>
+        </div>
+      </div>
+      <div class="savebar"><span class="msg" id="customMsg" role="status"></span><button type="button" class="btn ghost" id="sCancel">Discard changes</button><button type="button" class="btn" id="sSave">Save changes</button></div>
+    </section>
   </main>
 </div>
 
@@ -129,35 +186,6 @@
   <div class="actions"><button type="button" class="btn danger left" id="fDel">Delete</button><button type="button" class="btn ghost" id="fCancel">Cancel</button><button class="btn">Save</button></div>
 </form></dialog>
 
-<dialog id="sdlg"><div class="setgrid">
-  <h3>Customize</h3>
-  <label class="l">App name</label><input id="sName">
-  <label class="l">Accent colour</label>
-  <div class="hexrow"><input type="color" id="sAccent" aria-label="Pick a colour"><input id="sHex" placeholder="#3b5bdb" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour"><button type="button" class="btn ghost sm" id="sHexReset">Reset to cobalt</button></div>
-  <div class="two"><div><label class="l">Theme</label><select id="sTheme"><option value="auto">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></div><div><label class="l">Week starts</label><select id="sWeek"><option value="1">Monday</option><option value="0">Sunday</option></select></div></div>
-  <div class="two"><div><label class="l">Day starts (hour)</label><input type="number" id="sDayStart" min="0" max="23"></div><div><label class="l">Day ends (hour)</label><input type="number" id="sDayEnd" min="1" max="24"></div></div>
-  <label class="chk"><input type="checkbox" id="sWeekend"> Show Saturday and Sunday</label>
-
-  <h4>Reminders</h4>
-  <label class="l">Assignments with no time are due at</label><input type="time" id="sDue">
-  <label class="l">Default for assignments</label><div class="chips" id="sRemA"></div>
-  <label class="l">Default for events</label><div class="chips" id="sRemE"></div>
-  <label class="l">Default for to-dos</label><div class="chips" id="sRemT"></div>
-  <label class="l">Keep reminding: assignments</label><div id="sNudA"></div>
-  <label class="l">Keep reminding: events</label><div id="sNudE"></div>
-  <label class="l">Keep reminding: to-dos</label><div id="sNudT"></div>
-  <p class="hint">As the deadline gets closer, the latest rule that has started takes over. Example: "Right away, every 30 min" then "On the due day, every 10 min".</p>
-  <div class="two"><div><label class="l">Nag about overdue every (hours, 0 = off)</label><input type="number" id="sNag" min="0"></div><div><label class="l">Morning summary at (hour, -1 = off)</label><input type="number" id="sDigest" min="-1" max="23"></div></div>
-  <p class="hint">Overdue items keep sending notifications until you tick them off.</p>
-
-  <h4>Courses</h4><div id="sCats"></div><button type="button" class="btn ghost sm" id="addCat">+ Add course</button>
-
-  <h4>Notifications</h4>
-  <label class="chk"><input type="checkbox" id="sMac"> Mac desktop notifications</label>
-  <label class="chk"><input type="checkbox" id="sPhone"> Phone and other devices (ntfy)</label>
-  <label class="l">ntfy topic: subscribe to this in the ntfy app</label><input id="sTopic">
-</div>
-<div class="actions"><button type="button" class="btn ghost left" id="sTest">Send test</button><button type="button" class="btn ghost" id="sCancel">Cancel</button><button type="button" class="btn" id="sSave">Save</button></div></dialog>
 
 <script src="note.js"></script>
 <script src="app.js"></script>

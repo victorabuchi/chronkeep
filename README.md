@@ -11,7 +11,7 @@ A personal calendar and to-do list that keeps reminding you until the work is do
 - **Notifications:** native macOS notifications on your laptop, and push to your phone through [ntfy](https://ntfy.sh).
 - **Note:** a floating note with checklists, tables and text styles, always one click away in the top bar.
 - **Settings:** profile picture, name, email and phone, a one-click export of your data, and delete account.
-- **Customisable:** the Customize panel changes the accent colour (type any hex code), theme, courses and colours, day hours and reminder defaults.
+- **Customisable:** the Customize page changes the accent colour (type any hex code), theme, courses and colours, day hours and reminder defaults.
 
 No dependencies, no build step. Your data stays on your machine in `data.json`.
 
