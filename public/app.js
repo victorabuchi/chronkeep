@@ -396,6 +396,12 @@ $('viewSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { v
 document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); render(); }));
 $('navTasks').onclick = () => setPage('tasks');
 $('railCal').onclick = () => setPage('cal');
+// The logo and name: back to the home page (the calendar, at today); already there, refresh it.
+$('home').onclick = (e) => {
+  e.preventDefault();
+  if (page === 'cal') return location.reload();
+  cur = new Date(); setPage('cal');
+};
 $('railSet').onclick = () => $('mSettings').click();
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open]') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
