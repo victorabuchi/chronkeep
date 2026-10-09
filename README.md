@@ -33,7 +33,7 @@ Reminders only fire while the server is running.
 
 ## Mac notifications
 
-Popups come from a tiny `ChronKeep.app` (built automatically on first run into `~/Library/Application Support/ChronKeep/`), so they show the ChronKeep icon rather than Script Editor's scroll. Rebuild it any time with `./mac/build-notifier.sh`. If a popup does not appear, check **System Settings > Notifications > ChronKeep** is allowed.
+Popups come from a tiny `ChronKeep.app` (built automatically on first run into `~/Library/Application Support/ChronKeep/`), so they show the ChronKeep icon rather than Script Editor's scroll. Rebuild it any time with `./mac/build-notifier.sh`. If a popup does not appear, check **System Settings > Notifications > ChronKeep** is allowed. macOS silently discards notifications from an app that was denied permission, and the server log cannot tell. Customize has a button that opens that pane.
 
 ## Layout
 

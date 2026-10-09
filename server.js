@@ -327,6 +327,10 @@ http.createServer(async (req, res) => {
   if (p === '/api/settings' && req.method === 'PUT') { db.settings = { ...db.settings, ...(await readBody(req)) }; save(); return send(res, 200, db.settings); }
   if (p === '/api/notepad' && req.method === 'PUT') { db.notepad = { html: String((await readBody(req)).html ?? ''), at: new Date().toISOString() }; save(); return send(res, 200, db.notepad); }
   if (p === '/api/notifications' && req.method === 'GET') return send(res, 200, { history: db.history.slice(0, 50), upcoming: upcoming() });
+  if (p === '/api/mac-settings' && req.method === 'POST') {
+    if (process.platform === 'darwin') execFile('open', ['x-apple.systempreferences:com.apple.Notifications-Settings.extension'], () => {});
+    return send(res, 200, { ok: true });
+  }
   if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!', { kind: 'test' }); return send(res, 200, { ok: true }); }
   if (p === '/api/items' && req.method === 'POST') {
     const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };

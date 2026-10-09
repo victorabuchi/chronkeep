@@ -354,6 +354,7 @@ async function saveSettings() {
   render();
 }
 $('sSave').onclick = async () => { await saveSettings(); $('customMsg').textContent = 'Saved'; setTimeout(() => ($('customMsg').textContent = ''), 2500); };
+$('sMacSet').onclick = () => api('POST', '/api/mac-settings');
 $('sTest').onclick = async () => { await saveSettings(); api('POST', '/api/test'); };
 $('mTest').onclick = () => { $('userMenu').hidden = true; api('POST', '/api/test'); };
 
