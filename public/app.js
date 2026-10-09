@@ -27,7 +27,8 @@ const DEF = { name: 'ChronKeep', userName: '', accent: '#3b5bdb', theme: 'auto',
 // Whatever the server sends, the page always has every setting it needs.
 const norm = (x) => ({ ...DEF, ...x, reminderDefaults: { ...DEF.reminderDefaults, ...(x && x.reminderDefaults) }, nudgeDefaults: { ...DEF.nudgeDefaults, ...(x && x.nudgeDefaults) }, categories: (x && x.categories) || [] });
 let S = norm({}), items = [], notepad = { html: '', at: null };
-let page = load('planner:page') === 'tasks' ? 'tasks' : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true;
+let P = { name: '', email: '', phone: '', photo: '' };
+let page = ['tasks', 'settings'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
 const vis = (it) => typeF === 'all' || it.type === typeF;
@@ -61,8 +62,10 @@ function applyTheme() {
   const r = document.documentElement.style;
   r.setProperty('--accent', S.accent);
   $('brand').textContent = S.name;
-  $('userName').textContent = S.userName || 'Me';
-  $('initials').textContent = (S.userName || S.name || 'M').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  $('userName').textContent = P.name || 'Your account';
+  $('userEmail').textContent = P.email || 'Personal planner';
+  $('initials').textContent = (P.name || S.name || 'C').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  $('initials').hidden = !!P.photo; $('avatarImg').hidden = !P.photo; if (P.photo) $('avatarImg').src = P.photo;
 }
 
 // ---------------------------------------------------------------- calendar
@@ -244,6 +247,9 @@ function nudgeEditor(box, rules, onChange) {
 function setPage(p) {
   page = p; store('planner:page', p);
   $('main').classList.toggle('tpage', p === 'tasks');
+  $('main').classList.toggle('spage', p === 'settings');
+  $('railSettings').classList.toggle('on', p === 'settings');
+  if (p === 'settings') fillProfile();
   $('tasks').classList.toggle('full', p === 'tasks');
   $('railCal').classList.toggle('on', p === 'cal');
   $('navTasks').classList.toggle('on', p === 'tasks');
@@ -311,7 +317,7 @@ function drawCats() {
 }
 $('mSettings').onclick = () => {
   $('userMenu').hidden = true;
-  $('sName').value = S.name; $('sUser').value = S.userName; $('sAccent').value = S.accent; $('sHex').value = S.accent; $('sHex').classList.remove('bad'); $('sTheme').value = S.theme;
+  $('sName').value = S.name; $('sAccent').value = S.accent; $('sHex').value = S.accent; $('sHex').classList.remove('bad'); $('sTheme').value = S.theme;
   $('sWeek').value = S.weekStart; $('sDayStart').value = S.dayStart; $('sDayEnd').value = S.dayEnd; $('sWeekend').checked = S.showWeekends; $('sDue').value = S.dueTime;
   $('sNag').value = S.nagHours; $('sDigest').value = S.digestHour;
   $('sMac').checked = S.notifyMac; $('sPhone').checked = S.notifyPhone; $('sTopic').value = S.ntfyTopic;
@@ -337,7 +343,7 @@ $('addCat').onclick = () => { cats.push({ name: 'New course', color: '#888888' }
 $('sCancel').onclick = () => $('sdlg').close();
 async function saveSettings() {
   S = norm(await api('PUT', '/api/settings', {
-    name: $('sName').value || 'My Planner', userName: $('sUser').value, accent: hexOf($('sHex').value) || $('sAccent').value, theme: $('sTheme').value,
+    name: $('sName').value || 'ChronKeep', accent: hexOf($('sHex').value) || $('sAccent').value, theme: $('sTheme').value,
     weekStart: +$('sWeek').value, dayStart: Math.min(+$('sDayStart').value, 22), dayEnd: Math.max(+$('sDayEnd').value, +$('sDayStart').value + 1), showWeekends: $('sWeekend').checked, dueTime: $('sDue').value || '23:59',
     nagHours: +$('sNag').value, digestHour: +$('sDigest').value, notifyMac: $('sMac').checked, notifyPhone: $('sPhone').checked, ntfyTopic: $('sTopic').value.trim(),
     reminderDefaults: { assignment: setA, event: setE, todo: setT }, nudgeDefaults: { assignment: nudA, event: nudE, todo: nudT }, categories: cats.filter((c) => c.name.trim()),
@@ -403,6 +409,49 @@ const noteBtn = () => $('btnNote').setAttribute('aria-pressed', PlannerNote.isOp
 $('btnNote').onclick = () => { PlannerNote.toggle(notepad); noteBtn(); };
 document.addEventListener('note:closed', noteBtn);
 
+// ---------------------------------------------------------------- settings page (account)
+let photoNew = null; // null = unchanged, '' = removed, otherwise a new picture
+const showPhoto = (src) => { $('photoImg').hidden = !src; $('photoIcon').hidden = !!src; if (src) $('photoImg').src = src; $('photoPick').textContent = src ? 'Change photo' : 'Add a photo'; $('photoRemove').hidden = !src; };
+function fillProfile() {
+  photoNew = null; $('pName').value = P.name; $('pEmail').value = P.email; $('pPhone').value = P.phone; showPhoto(P.photo);
+  $('profileMsg').textContent = ''; $('delConfirm').value = ''; $('delBtn').disabled = true; $('delMsg').textContent = '';
+  $('delLabel').textContent = P.email ? `Type ${P.email} to confirm` : 'Type DELETE to confirm';
+}
+const flash = (el, text, bad) => { el.textContent = text; el.classList.toggle('bad', !!bad); };
+$('photoBtn').onclick = $('photoPick').onclick = () => $('photoFile').click();
+$('photoRemove').onclick = () => { photoNew = ''; showPhoto(''); };
+$('photoFile').onchange = async (e) => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) return flash($('profileMsg'), 'Choose a picture.', true);
+  try {
+    const bmp = await createImageBitmap(file), k = Math.min(1, 240 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    photoNew = c.toDataURL('image/jpeg', 0.82); showPhoto(photoNew); flash($('profileMsg'), '');
+  } catch { flash($('profileMsg'), 'That picture could not be read. Try a JPG or PNG.', true); }
+};
+$('profileForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = { name: $('pName').value, email: $('pEmail').value, phone: $('pPhone').value };
+  if (photoNew !== null) body.photo = photoNew;
+  const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  if (!r.ok) return flash($('profileMsg'), data.error || 'Could not save.', true);
+  P = data; photoNew = null; applyTheme(); fillProfile(); flash($('profileMsg'), 'Saved');
+  setTimeout(() => flash($('profileMsg'), ''), 2500);
+};
+$('delConfirm').oninput = (e) => { $('delBtn').disabled = e.target.value.trim().toLowerCase() !== (P.email || 'DELETE').toLowerCase(); };
+$('delForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await fetch('/api/account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: $('delConfirm').value }) });
+  if (!r.ok) return flash($('delMsg'), (await r.json()).error || 'Could not delete.', true);
+  try { Object.keys(localStorage).filter((k) => k.startsWith('planner:')).forEach((k) => localStorage.removeItem(k)); } catch {}
+  location.reload();
+};
+$('railSettings').onclick = () => setPage('settings');
+$('mProfile').onclick = () => { $('userMenu').hidden = true; setPage('settings'); };
+
 // ---------------------------------------------------------------- search
 // Finds items on any date, not only the ones on screen.
 let sList = [], sIdx = 0;
@@ -440,7 +489,7 @@ document.addEventListener('click', (e) => { if (!e.target.closest('.swrap')) $('
 // ---------------------------------------------------------------- start
 (async () => {
   const st = await api('GET', '/api/state');
-  S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
+  P = { ...P, ...st.profile }; S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
   setPage(page);
   render();
   if (PlannerNote.wasOpen()) { PlannerNote.open(notepad); noteBtn(); }

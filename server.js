@@ -13,7 +13,7 @@ const PUBLIC = path.join(__dirname, 'public');
 const defaults = () => ({
   settings: {
     name: 'ChronKeep',
-    userName: 'Victor Abuchi',
+    userName: '',
     accent: '#3b5bdb',
     theme: 'auto',
     weekStart: 1,
@@ -42,6 +42,7 @@ const defaults = () => ({
     notifyMac: true,
     notifyPhone: true,
   },
+  profile: { name: '', email: '', phone: '', photo: '' },
   items: [],
   notified: [],
   lastDigest: '',
@@ -54,6 +55,10 @@ try {
   const saved = JSON.parse(fs.readFileSync(DATA, 'utf8'));
   db = { ...db, ...saved, settings: { ...db.settings, ...saved.settings } };
 } catch {}
+// The name used to live in settings; the profile now holds it.
+db.profile = { ...defaults().profile, ...db.profile };
+if (!db.profile.name && db.settings.userName) db.profile.name = db.settings.userName;
+delete db.settings.userName;
 // Settings saved by earlier versions: move to the current palette.
 delete db.settings.headerColor;
 if (db.settings.name === 'My Planner') db.settings.name = 'ChronKeep';
@@ -236,7 +241,38 @@ const readBody = (req) => new Promise((r) => { let b = ''; req.on('data', (c) =>
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
-  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad });
+  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile });
+  if (p === '/api/profile' && req.method === 'PUT') {
+    const b = await readBody(req), next = { ...db.profile };
+    if ('name' in b) next.name = String(b.name).trim().slice(0, 80);
+    if ('email' in b) {
+      const e = String(b.email).trim().slice(0, 120);
+      if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return send(res, 400, { error: 'That email does not look right.' });
+      next.email = e;
+    }
+    if ('phone' in b) {
+      const ph = String(b.phone).trim().slice(0, 30);
+      if (ph && !/^[0-9+()\-.\s]{5,30}$/.test(ph)) return send(res, 400, { error: 'Use digits, spaces, + ( ) - only for the phone number.' });
+      next.phone = ph;
+    }
+    if ('photo' in b) {
+      const ph = String(b.photo || '');
+      if (ph && !/^data:image\/(jpeg|png|webp);base64,/.test(ph)) return send(res, 400, { error: 'That picture could not be used.' });
+      if (ph.length > 600000) return send(res, 400, { error: 'That picture is too large.' });
+      next.photo = ph;
+    }
+    db.profile = next; save(); return send(res, 200, db.profile);
+  }
+  if (p === '/api/export' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="chronkeep-export-${ymd(new Date())}.json"` });
+    return res.end(JSON.stringify({ exportedAt: new Date().toISOString(), profile: db.profile, settings: db.settings, items: db.items, notepad: db.notepad }, null, 2));
+  }
+  if (p === '/api/account' && req.method === 'DELETE') {
+    const want = db.profile.email || 'DELETE';
+    if (String((await readBody(req)).confirm || '').trim().toLowerCase() !== want.toLowerCase()) return send(res, 400, { error: 'The confirmation did not match.' });
+    db = defaults(); save();
+    return send(res, 200, { ok: true });
+  }
   if (p === '/api/settings' && req.method === 'PUT') { db.settings = { ...db.settings, ...(await readBody(req)) }; save(); return send(res, 200, db.settings); }
   if (p === '/api/notepad' && req.method === 'PUT') { db.notepad = { html: String((await readBody(req)).html ?? ''), at: new Date().toISOString() }; save(); return send(res, 200, db.notepad); }
   if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!'); return send(res, 200, { ok: true }); }
