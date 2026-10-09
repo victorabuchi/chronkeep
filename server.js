@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { execFile } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
@@ -66,13 +67,35 @@ const save = () => fs.writeFileSync(DATA, JSON.stringify(db, null, 2));
 save();
 
 // ---- notifications ----
+// Mac popups come from a tiny ChronKeep.app (see mac/) so they show our icon and name.
+// One at a time, because the app reads its message from a file. Falls back to a plain
+// script notification if the app is missing.
+const NOTIFIER = path.join(os.homedir(), 'Library/Application Support/ChronKeep/ChronKeep.app');
+const NOTE_FILE = path.join(os.homedir(), 'Library/Caches/ChronKeep/notify.txt');
+let macQueue = Promise.resolve();
+function plainNotify(title, body) {
+  const esc = (t) => String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  execFile('osascript', ['-e', `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`], () => {});
+}
+function macNotify(title, body) {
+  if (process.platform !== 'darwin') return;
+  macQueue = macQueue.then(() => new Promise((done) => {
+    if (!fs.existsSync(NOTIFIER)) { plainNotify(title, body); return done(); }
+    const one = (t) => String(t).replace(/\s+/g, ' ').trim();
+    try {
+      fs.mkdirSync(path.dirname(NOTE_FILE), { recursive: true });
+      fs.writeFileSync(NOTE_FILE, `${one(title)}\n${one(body)}`);
+    } catch { plainNotify(title, body); return done(); }
+    execFile('open', ['-W', '-g', '-a', NOTIFIER], (err) => { if (err) plainNotify(title, body); done(); });
+  }));
+}
+// Build the notifier app the first time, if this Mac does not have it yet.
+if (process.platform === 'darwin' && !fs.existsSync(NOTIFIER)) execFile('sh', [path.join(__dirname, 'mac', 'build-notifier.sh')], (e) => e && console.error('Could not build the Mac notifier:', e.message));
+
 function notify(title, body) {
   console.log(new Date().toLocaleTimeString(), 'notify:', title, '|', body);
   const s = db.settings;
-  if (s.notifyMac) {
-    const esc = (t) => String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    execFile('osascript', ['-e', `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`], () => {});
-  }
+  if (s.notifyMac) macNotify(title, body);
   if (s.notifyPhone && s.ntfyTopic) {
     fetch(`${s.ntfyServer.replace(/\/$/, '')}/${encodeURIComponent(s.ntfyTopic)}`, {
       method: 'POST',

@@ -29,10 +29,15 @@ Open http://localhost:3000. Use `PORT=3001 node server.js` for another port.
 
 Reminders only fire while the server is running.
 
+## Mac notifications
+
+Popups come from a tiny `ChronKeep.app` (built automatically on first run into `~/Library/Application Support/ChronKeep/`), so they show the ChronKeep icon rather than Script Editor's scroll. Rebuild it any time with `./mac/build-notifier.sh`. If a popup does not appear, check **System Settings > Notifications > ChronKeep** is allowed.
+
 ## Layout
 
 ```
 server.js        API, scheduler, notifications
+mac/             builds the ChronKeep.app that Mac notifications come from
 public/          the web app (index.html, app.js, app.css, note.js, note.css)
 data.json        your data (created on first run, git-ignored)
 ```
