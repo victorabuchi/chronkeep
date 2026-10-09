@@ -239,3 +239,5 @@ dialog input:focus,dialog select:focus,dialog textarea:focus{border-color:var(--
 .sr .st.dn{text-decoration:line-through;color:var(--muted)}
 .sr .sm{flex:none;color:var(--muted);font-size:12px}
 .sempty{padding:14px;text-align:center;color:var(--muted)}
+.tasks:not(.full) .quick{grid-template-columns:1fr 1fr}
+.tasks:not(.full) .qin{grid-column:1/-1}
