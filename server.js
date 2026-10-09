@@ -43,6 +43,7 @@ const defaults = () => ({
     notifyPhone: true,
   },
   profile: { name: '', email: '', phone: '', photo: '' },
+  history: [],
   items: [],
   notified: [],
   lastDigest: '',
@@ -97,7 +98,11 @@ function macNotify(title, body) {
 // Build the notifier app the first time, if this Mac does not have it yet.
 if (process.platform === 'darwin' && !fs.existsSync(NOTIFIER)) execFile('sh', [path.join(__dirname, 'mac', 'build-notifier.sh')], (e) => e && console.error('Could not build the Mac notifier:', e.message));
 
-function notify(title, body) {
+// kind: reminder | repeat | overdue | summary | test. Every notification is kept in the history.
+function notify(title, body, meta = {}) {
+  db.history.unshift({ at: Date.now(), title, body, kind: meta.kind || 'reminder', itemId: meta.itemId || null });
+  db.history.length = Math.min(db.history.length, 100);
+  save();
   console.log(new Date().toLocaleTimeString(), 'notify:', title, '|', body);
   const s = db.settings;
   if (s.notifyMac) macNotify(title, body);
@@ -165,6 +170,52 @@ function prime(item) {
   }
 }
 
+// What is still to come: one-off reminders, the next repeating reminder per item,
+// overdue nags and the morning summary. Mirrors the rules tick() follows.
+function upcoming() {
+  const now = new Date(), nowMs = now.getTime(), horizon = nowMs + 7 * 86400000, out = [];
+  const s = db.settings;
+  for (const item of db.items) {
+    if (!item.date) continue;
+    let nudgeDone = false;
+    for (let off = 0; off <= 30; off++) {
+      const d = new Date(now); d.setDate(d.getDate() + off);
+      if (!occursOn(item, d) || isDoneOn(item, d)) continue;
+      const at = atOn(item, d);
+      if (at.getTime() < nowMs - 3600000) continue;
+      for (const rem of item.reminders || []) {
+        const fire = at.getTime() - rem * 60000;
+        if (fire > nowMs && fire < horizon && !db.notified.includes(`${item.id}@${ymd(d)}@${rem}`)) out.push({ at: fire, title: `${label(item)}: ${item.title}`, body: rem > 0 ? `Due in ${lead(rem)}` : 'Due now', kind: 'reminder', itemId: item.id });
+      }
+      if (!nudgeDone && (item.nudges || []).length && at.getTime() > nowMs) {
+        nudgeDone = true;
+        const rule = activeRule(item, at, now), last = db.nudged[`${item.id}@${ymd(d)}`] || 0;
+        let next = null, every = null;
+        if (rule) { next = Math.max(nowMs, last + rule.every * 60000); every = rule.every; }
+        else {
+          for (const r of item.nudges) {
+            const from = r.from === 'day' ? (at - new Date(at).setHours(0, 0, 0, 0)) / 60000 : Number(r.from);
+            const start = at.getTime() - from * 60000;
+            if (start > nowMs && (next === null || start < next)) { next = start; every = Number(r.every); }
+          }
+        }
+        if (next !== null && next < horizon) out.push({ at: next, title: `${label(item)}: ${item.title}`, body: `Repeating reminder, every ${human(every)} until it is done`, kind: 'repeat', itemId: item.id });
+      }
+      if (off > 14) break;
+    }
+    if (s.nagHours > 0 && (!item.repeat || item.repeat === 'none') && !item.done && item.type !== 'event') {
+      const due = atOn(item, new Date(item.date + 'T00:00')).getTime();
+      if (due < nowMs && nowMs - due < 14 * 86400000) out.push({ at: Math.max(nowMs, (item.lastNag || due) + s.nagHours * 3600000), title: `OVERDUE: ${item.title}`, body: `Reminding every ${human(s.nagHours * 60)} until you tick it off`, kind: 'overdue', itemId: item.id });
+    }
+  }
+  if (s.digestHour >= 0) {
+    const t = new Date(now); t.setHours(s.digestHour, 0, 0, 0);
+    if (t.getTime() <= nowMs || db.lastDigest === ymd(now)) t.setDate(t.getDate() + 1);
+    out.push({ at: t.getTime(), title: 'Morning summary', body: 'What is due today and what is overdue', kind: 'summary', itemId: null });
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, 30);
+}
+
 function tick() {
   const now = new Date();
   let changed = false;
@@ -183,7 +234,7 @@ function tick() {
         const fire = at.getTime() - rem * 60000;
         if (now.getTime() >= fire && now.getTime() < at.getTime() + 3600000) {
           const when = `${ymd(d) === ymd(now) ? 'today' : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ' at ' + item.time : ''}`;
-          notify(`${label(item)}: ${item.title}`, `${rem > 0 ? `Due in ${lead(rem)} - ` : 'Due now - '}${when}${item.category ? ' - ' + item.category : ''}`);
+          notify(`${label(item)}: ${item.title}`, `${rem > 0 ? `Due in ${lead(rem)} - ` : 'Due now - '}${when}${item.category ? ' - ' + item.category : ''}`, { kind: 'reminder', itemId: item.id });
           db.notified.push(key); changed = true;
         }
       }
@@ -198,7 +249,7 @@ function tick() {
         const key = `${item.id}@${ymd(d)}`;
         if (now.getTime() - (db.nudged[key] || 0) >= rule.every * 60000 - 2000) {
           const left = (due - now) / 60000;
-          notify(`${label(item)}: ${item.title}`, `Due in ${human(left)} (${due.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ', ' + item.time : ''}). Reminding every ${human(rule.every)}. Tick it off to stop.`);
+          notify(`${label(item)}: ${item.title}`, `Due in ${human(left)} (${due.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ', ' + item.time : ''}). Reminding every ${human(rule.every)}. Tick it off to stop.`, { kind: 'repeat', itemId: item.id });
           db.nudged[key] = now.getTime(); changed = true;
         }
         break;
@@ -209,7 +260,7 @@ function tick() {
       const due = atOn(item, new Date(item.date + 'T00:00'));
       const since = now.getTime() - due.getTime();
       if (since > 0 && since < 14 * 86400000 && now.getTime() - (item.lastNag || due.getTime()) >= s.nagHours * 3600000) {
-        notify(`OVERDUE: ${item.title}`, `${label(item)} was due ${due.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. Tick it off in the planner when done.`);
+        notify(`OVERDUE: ${item.title}`, `${label(item)} was due ${due.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. Tick it off in the planner when done.`, { kind: 'overdue', itemId: item.id });
         item.lastNag = now.getTime(); changed = true;
       }
     }
@@ -221,7 +272,7 @@ function tick() {
     const overdue = db.items.filter((it) => it.date && it.repeat === 'none' && !it.done && it.type !== 'event' && it.date < ymd(now));
     if (today.length || overdue.length) {
       const names = [...overdue.map((i) => '! ' + i.title), ...today.map((i) => i.title)].slice(0, 6).join(', ');
-      notify(`Today: ${today.length} due${overdue.length ? `, ${overdue.length} overdue` : ''}`, names);
+      notify(`Today: ${today.length} due${overdue.length ? `, ${overdue.length} overdue` : ''}`, names, { kind: 'summary' });
     }
     db.lastDigest = ymd(now); changed = true;
   }
@@ -275,7 +326,8 @@ http.createServer(async (req, res) => {
   }
   if (p === '/api/settings' && req.method === 'PUT') { db.settings = { ...db.settings, ...(await readBody(req)) }; save(); return send(res, 200, db.settings); }
   if (p === '/api/notepad' && req.method === 'PUT') { db.notepad = { html: String((await readBody(req)).html ?? ''), at: new Date().toISOString() }; save(); return send(res, 200, db.notepad); }
-  if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!'); return send(res, 200, { ok: true }); }
+  if (p === '/api/notifications' && req.method === 'GET') return send(res, 200, { history: db.history.slice(0, 50), upcoming: upcoming() });
+  if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!', { kind: 'test' }); return send(res, 200, { ok: true }); }
   if (p === '/api/items' && req.method === 'POST') {
     const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
     prime(it); db.items.push(it); save(); return send(res, 200, it);

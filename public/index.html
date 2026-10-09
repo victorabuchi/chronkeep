@@ -21,7 +21,12 @@
   <div class="swrap"><label class="sbox"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search" autocomplete="off"><kbd>/</kbd></label><div class="sres" id="sres" role="listbox" hidden></div></div>
   <div class="topr">
     <button class="ibtn" id="btnNote" aria-label="Note" aria-pressed="false" title="Note"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></button>
-    <button class="ibtn" id="btnBell" aria-label="Due soon" title="Overdue and due today"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="badge" id="badge" hidden>0</span></button>
+    <div class="popwrap"><button class="ibtn" id="btnBell" aria-label="Due soon" title="Overdue and due today"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="badge" id="badge" hidden>0</span></button>
+      <div class="npop" id="nPop" hidden role="dialog" aria-label="Notifications">
+        <div class="nhead"><strong>Notifications</strong><button type="button" class="linkbtn" id="nTasks">Open tasks</button></div>
+        <div class="segment ntabs"><button type="button" data-n="upcoming" data-on="true">Upcoming</button><button type="button" data-n="history">Earlier</button></div>
+        <div class="nlist" id="nList"></div>
+      </div></div>
     <button class="btn" id="btnAdd"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New</button>
     <div class="popwrap">
       <button class="avatar" id="userBtn" aria-label="Account"><span id="initials">C</span><img id="avatarImg" alt="" hidden></button>
