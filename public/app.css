@@ -418,3 +418,11 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .banner b{font-weight:800}
 .banner .bact{display:flex;gap:8px}
 .brow .binact{display:flex;align-items:center;gap:8px}
+
+/* typing a sentence */
+.qprev{padding:5px 9px;border-radius:8px;background:var(--bt);color:var(--b);font-size:12px;animation:rise .25s ease both}
+.qprev span{color:var(--muted);font-weight:600}
+.sr.add{border-top:1px solid var(--line);border-radius:0 0 8px 8px;margin-top:4px}
+.sr.add .plus{display:grid;place-items:center;width:16px;height:16px;border-radius:5px;background:var(--b);color:var(--on-b);font-style:normal;font-weight:800;font-size:13px;line-height:1}
+.sr.add .st{color:var(--b)}
+.qprev{grid-column:1/-1}

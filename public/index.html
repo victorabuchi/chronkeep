@@ -73,7 +73,8 @@
         <div class="thctl"><div class="segment tonly" data-typetabs><button data-f="all" data-on="true">All</button><button data-f="assignment">Assignments</button><button data-f="todo">To-do</button></div><span class="sub" id="tsub"></span></div>
       </header>
       <form class="quick" id="quick">
-        <input class="qin" id="qTitle" placeholder="Add a task, press Enter" autocomplete="off">
+        <input class="qin" id="qTitle" placeholder="Try: Robotics report due Sunday 11pm" autocomplete="off">
+        <div class="qprev" id="qPrev" hidden></div>
         <select id="qType"><option value="assignment">Assignment</option><option value="todo">To-do</option></select>
         <input type="date" id="qDate">
         <input type="time" id="qTime" class="tonly" title="Time (optional)">
@@ -253,6 +254,7 @@
   <div class="actions"><button type="button" class="btn" id="helpClose">Got it</button></div>
 </dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="quick.js"></script>
 <script src="note.js"></script>
 <script src="app.js"></script>
 </body>
