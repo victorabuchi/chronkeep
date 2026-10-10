@@ -73,3 +73,11 @@ document.addEventListener('keydown', (e) => {
   else if ((k === 'ArrowLeft' || k === 'ArrowRight') && page === 'cal') { e.preventDefault(); step(k === 'ArrowLeft' ? -1 : 1); }
   else if ('123456'.includes(k) && k) setPage(['cal', 'tasks', 'history', 'bin', 'settings', 'customize'][+k - 1]);
 });
+
+// A card (the item dialog, the help, ...) closes when you tap anywhere outside it: no need to scroll down to Cancel.
+document.addEventListener('click', (e) => {
+  const dlg = e.target;
+  if (!(dlg instanceof HTMLDialogElement) || !dlg.open) return;
+  const r = dlg.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close();
+});

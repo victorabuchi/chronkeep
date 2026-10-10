@@ -71,12 +71,12 @@
     <aside class="tasks" id="tasks">
       <header>
         <div class="thead"><small class="eyebrow tonly">Everything you owe</small><h2>Tasks</h2></div>
-        <div class="thctl"><div class="segment tonly" data-typetabs><button data-f="all" data-on="true">All</button><button data-f="assignment">Assignments</button><button data-f="todo" title="Everything still to do, as big cards">To-do</button></div><span class="sub" id="tsub"></span></div>
+        <div class="thctl"><div class="segment tonly" data-typetabs><button data-f="all" data-on="true">All</button><button data-f="assignment">Assignments</button><button data-f="todo" title="Everything still to do, as big cards">To-do</button><button data-f="event">Events</button></div><span class="sub" id="tsub"></span></div>
       </header>
       <form class="quick" id="quick">
         <input class="qin" id="qTitle" placeholder="Try: Robotics report due Sunday 11pm" autocomplete="off">
         <div class="qprev" id="qPrev" hidden></div>
-        <select id="qType"><option value="assignment">Assignment</option><option value="todo">To-do</option></select>
+        <select id="qType"><option value="assignment">Assignment</option><option value="todo">To-do</option><option value="event">Event</option></select>
         <input type="date" id="qDate">
         <input type="time" id="qTime" class="tonly" title="Time (optional)">
         <button class="btn tonly qadd">Add</button>

@@ -61,7 +61,30 @@ function taskCard(it, d, group) {
   return `<article class="trow tcard ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${d ? ymd(d) : ''}" ${many ? `data-ids="${group.map(([x]) => x.id).join(',')}"` : ''} style="--c:${c}"><div class="chead"><button type="button" class="circle big ${done ? 'on' : ''}" data-tick aria-label="${done ? 'Mark as not done' : 'Tick off'}"></button><div class="ctitle"><h3>${esc(it.title)}${many ? ` <b class="cnt" title="${group.length} on this day: ticking it ticks them all">${group.length}</b>` : ''}</h3><div class="cmeta">${due}${it.category ? `<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>` : ''}${prio}${rep(it) ? `<span>↻ ${it.repeat}</span>` : ''}</div></div></div>${it.notes ? `<p class="cnotes">${esc(it.notes)}</p>` : ''}${steps}${remind}${nudge}${files}</article>`;
 }
 
+// The Events tab on the Tasks page: what is coming up in the next 30 days, grouped like the tasks are.
+function eventRow(it, d) {
+  const c = color(it.category), sg = Recur.segment(it, d, 0, 1440), when = it.time ? `${it.time}${it.endTime ? ' to ' + it.endTime : ''}` : 'All day';
+  const start = it.time ? new Date(`${ymd(d)}T${it.time}`) : d, [t, k] = rel(start);
+  return `<div class="trow erow" data-id="${it.id}" data-d="${ymd(d)}" data-occ="${Recur.startFor(it, d) || ymd(d)}" style="--c:${c}"><i class="evbar"></i><div class="tx"><div class="ti">${esc(it.title)}</div><div class="me"><span class="kind">Event</span>${it.category ? `<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>` : ''}<span>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}, ${when}</span>${it.location ? `<span>${esc(it.location)}</span>` : ''}${k !== 'late' ? `<span class="pill ${k}">${t}</span>` : ''}</div></div></div>`;
+}
+function renderEvents() {
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()), B = { Today: [], Tomorrow: [], 'This week': [], Later: [] };
+  let n = 0;
+  for (let i = 0; i < 31; i++) {
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    const todays = items.filter((it) => it.type === 'event' && showsOn(it, d) && Recur.startFor(it, d) === ymd(d) && (!it.time || new Date(`${ymd(d)}T${it.endTime || it.time}`) >= now)).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    for (const it of todays) { (i === 0 ? B.Today : i === 1 ? B.Tomorrow : i <= 7 ? B['This week'] : B.Later).push([it, d]); n++; }
+  }
+  let h = '';
+  for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="gcard"><div class="grp"><span>${name}</span><span>${list.length}</span></div>${list.map(([it, d]) => eventRow(it, d)).join('')}</section>`;
+  if (!n) h = '<div class="empty">No events in the next 30 days.</div>';
+  $('tlist').classList.remove('cards');
+  $('tlist').innerHTML = h;
+  $('tsub').textContent = `${n} coming up`;
+}
+
 function renderTasks() {
+  if (typeF === 'event' && page === 'tasks') return renderEvents();
   const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const open = [], doneL = [];
   for (const it of items) {

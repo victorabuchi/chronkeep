@@ -595,3 +595,6 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .ev.asg.late{--c:var(--neg);background-color:var(--neg-bg)}
 .ev.asg.late .tm{color:var(--neg)}.ev.asg.late .cnt{background:var(--neg)}
 .ev.asg.done{opacity:.5}.ev.asg.done .nm{text-decoration:line-through}
+
+.erow{cursor:pointer;align-items:center;gap:12px}
+.erow .evbar{flex:none;align-self:stretch;width:4px;border-radius:2px;background:var(--c)}
