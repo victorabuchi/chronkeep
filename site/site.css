@@ -168,3 +168,6 @@ footer.foot a:hover { color: #fff; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .film-cursor { transition: none; } .film-frames img { transition: none; } }
 .nav .btn { min-height: 40px; padding: 8px 16px; white-space: nowrap; font-size: 15px; }
 @media (max-width: 420px) { .nav .wrap { gap: 10px; } .nav .btn { padding: 8px 12px; font-size: 14px; } .logo { font-size: 19px; } }
+
+.nav [data-guest], .nav [data-member] { display: inline-flex; gap: 10px; align-items: center; }
+.nav [hidden] { display: none !important; }

@@ -11,7 +11,8 @@
   <a class="logo" href="/"><span class="tile"><img src="/icon-192.png" alt="" width="36" height="36"></span>ChronKeep</a>
   <nav class="links" aria-label="Main"><a href="#features">Features</a><a href="#how">How it works</a><a href="#everywhere">On your phone</a></nav>
   <span class="grow"></span>
-  <a class="btn btn-ghost" href="/login">Log in</a><a class="btn btn-primary" href="/signup">Start free</a>
+  <span data-guest><a class="btn btn-ghost" href="/login">Log in</a> <a class="btn btn-primary" href="/signup">Start free</a></span>
+  <span data-member hidden><a class="btn btn-primary" href="/app">Open app</a> <button type="button" class="btn btn-ghost" data-signout>Sign out</button></span>
 </div></header>
 
 <section class="hero" id="top"><div class="aurora" aria-hidden="true"></div><div class="wrap">
@@ -53,5 +54,22 @@
 </div></section>
 
 <footer class="foot"><div class="wrap"><span>© <script>document.write(new Date().getFullYear())</script> ChronKeep</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:contact@victorabuchi.com">Contact</a><a href="/login">Log in</a></nav></div></footer>
+<script>
+// Signed in? Show "Open app" and "Sign out" instead of "Log in" and "Start free".
+fetch('/api/me').then((r) => r.ok && r.json()).then((me) => {
+  if (!me) return;
+  document.querySelectorAll('[data-guest]').forEach((e) => (e.hidden = true));
+  document.querySelectorAll('[data-member]').forEach((e) => (e.hidden = false));
+  document.querySelectorAll('.cta a[href="/signup"]').forEach((a) => { a.textContent = 'Open your app'; a.href = '/app'; });
+  document.querySelectorAll('.cta a[href="/login"]').forEach((a) => (a.hidden = true));
+  document.querySelectorAll('footer a[href="/login"]').forEach((a) => { a.textContent = 'Sign out'; a.href = '#'; a.dataset.signout = ''; });
+}).catch(() => {});
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('[data-signout]')) return;
+  e.preventDefault();
+  await fetch('/auth/logout', { method: 'POST' });
+  location.href = '/login';
+});
+</script>
 <script src="/site/film-scenes.js"></script><script src="/site/film.js"></script>
 </body></html>
