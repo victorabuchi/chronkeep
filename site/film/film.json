@@ -1,0 +1,260 @@
+{
+ "phone": {
+  "size": [
+   390,
+   780
+  ],
+  "frames": {
+   "week": "p-week.webp",
+   "month": "p-month.webp",
+   "edit": "p-edit.webp",
+   "edit-reminders": "p-edit-reminders.webp",
+   "bell": "p-bell.webp",
+   "history": "p-history.webp",
+   "customize": "p-customize.webp",
+   "search": "p-search.webp",
+   "q0": "p-q0.webp",
+   "q1": "p-q1.webp",
+   "q2": "p-q2.webp",
+   "q3": "p-q3.webp",
+   "q4": "p-q4.webp",
+   "q-added": "p-q-added.webp",
+   "t0": "p-t0.webp",
+   "t1": "p-t1.webp",
+   "t2": "p-t2.webp"
+  },
+  "rects": {
+   "newBtn": {
+    "x": 302,
+    "y": 10,
+    "w": 36,
+    "h": 36
+   },
+   "roboticsChip": {
+    "x": 274,
+    "y": 311,
+    "w": 99,
+    "h": 53
+   },
+   "monthBtn": {
+    "x": 16,
+    "y": 215,
+    "w": 62,
+    "h": 32
+   },
+   "lectureEv": {
+    "x": 271,
+    "y": 552,
+    "w": 104,
+    "h": 110
+   },
+   "bell": {
+    "x": 260,
+    "y": 10,
+    "w": 36,
+    "h": 36
+   },
+   "dlgSave": {
+    "x": 289,
+    "y": 1288,
+    "w": 61,
+    "h": 36
+   },
+   "dlgCancel": {
+    "x": 206,
+    "y": 1288,
+    "w": 74,
+    "h": 36
+   },
+   "remChips": {
+    "x": 40,
+    "y": 340,
+    "w": 310,
+    "h": 101
+   },
+   "nudges": {
+    "x": 40,
+    "y": 474,
+    "w": 310,
+    "h": 200
+   },
+   "bellPop": {
+    "x": 8,
+    "y": 60,
+    "w": 374,
+    "h": 527
+   },
+   "histStats": {
+    "x": 12,
+    "y": 135,
+    "w": 366,
+    "h": 259
+   },
+   "railSet": {
+    "x": 258,
+    "y": 729,
+    "w": 63,
+    "h": 44
+   },
+   "railHistory": {
+    "x": 132,
+    "y": 729,
+    "w": 63,
+    "h": 44
+   },
+   "search": {
+    "x": 91,
+    "y": 17,
+    "w": 110,
+    "h": 22
+   },
+   "qTitle": {
+    "x": 25,
+    "y": 373,
+    "w": 340,
+    "h": 34
+   },
+   "qPrev": {
+    "x": 25,
+    "y": 413,
+    "w": 340,
+    "h": 27
+   },
+   "tickRow": {
+    "x": 29,
+    "y": 1001,
+    "w": 19,
+    "h": 19
+   }
+  }
+ },
+ "desktop": {
+  "size": [
+   1100,
+   700
+  ],
+  "frames": {
+   "week": "d-week.webp",
+   "month": "d-month.webp",
+   "edit": "d-edit.webp",
+   "edit-reminders": "d-edit-reminders.webp",
+   "bell": "d-bell.webp",
+   "history": "d-history.webp",
+   "customize": "d-customize.webp",
+   "search": "d-search.webp",
+   "q0": "d-q0.webp",
+   "q1": "d-q1.webp",
+   "q2": "d-q2.webp",
+   "q3": "d-q3.webp",
+   "q4": "d-q4.webp",
+   "q-added": "d-q-added.webp",
+   "t0": "d-t0.webp",
+   "t1": "d-t1.webp",
+   "t2": "d-t2.webp"
+  },
+  "rects": {
+   "newBtn": {
+    "x": 960,
+    "y": 10,
+    "w": 80,
+    "h": 36
+   },
+   "roboticsChip": {
+    "x": 315,
+    "y": 227,
+    "w": 78,
+    "h": 69
+   },
+   "monthBtn": {
+    "x": 548,
+    "y": 131,
+    "w": 66,
+    "h": 32
+   },
+   "lectureEv": {
+    "x": 312,
+    "y": 500,
+    "w": 83,
+    "h": 110
+   },
+   "bell": {
+    "x": 916,
+    "y": 10,
+    "w": 36,
+    "h": 36
+   },
+   "dlgSave": {
+    "x": 706,
+    "y": 1168,
+    "w": 61,
+    "h": 36
+   },
+   "dlgCancel": {
+    "x": 623,
+    "y": 1168,
+    "w": 74,
+    "h": 36
+   },
+   "remChips": {
+    "x": 333,
+    "y": 318,
+    "w": 434,
+    "h": 65
+   },
+   "nudges": {
+    "x": 333,
+    "y": 417,
+    "w": 434,
+    "h": 120
+   },
+   "bellPop": {
+    "x": 612,
+    "y": 54,
+    "w": 400,
+    "h": 527
+   },
+   "histStats": {
+    "x": 84,
+    "y": 135,
+    "w": 996,
+    "h": 78
+   },
+   "railSet": {
+    "x": 10,
+    "y": 598,
+    "w": 43,
+    "h": 42
+   },
+   "railHistory": {
+    "x": 10,
+    "y": 164,
+    "w": 43,
+    "h": 42
+   },
+   "search": {
+    "x": 200,
+    "y": 17,
+    "w": 230,
+    "h": 22
+   },
+   "qTitle": {
+    "x": 773,
+    "y": 116,
+    "w": 294,
+    "h": 34
+   },
+   "qPrev": {
+    "x": 773,
+    "y": 156,
+    "w": 294,
+    "h": 27
+   },
+   "tickRow": {
+    "x": 777,
+    "y": 246,
+    "w": 19,
+    "h": 19
+   }
+  }
+ }
+}
