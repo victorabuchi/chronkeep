@@ -118,11 +118,12 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDuePo
 
 function renderGrid(days) {
   const n = days.length, rows = S.dayEnd - S.dayStart, top0 = S.dayStart * 60, now = new Date(), todayS = ymd(now);
-  let head = `<div class="dhead corner"></div>`, due = `<div class="due lab">DUE</div>`, cols = '';
+  let head = `<div class="dhead corner"></div>`, due = `<div class="due lab">DUE</div>`, cols = '', anyDue = false;
   for (const d of days) {
     const t = ymd(d) === todayS;
     head += `<div class="dhead ${t ? 'today' : ''}"><span class="dw">${DOW[d.getDay()]}</span><span class="dn">${d.getDate()}</span></div>`;
     const { timed, dueList } = splitDay(d);
+    if (dueList.length) anyDue = true;
     due += `<div class="due ${t ? 'today' : ''}" data-drop="${ymd(d)}">${dueStrip(dueList, d)}</div>`;
     let evs = lanes(timed).map((ev) => {
       const c = color(ev.it.category), w = 100 / ev.n;
@@ -133,7 +134,7 @@ function renderGrid(days) {
     cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
   }
   const gut = Array.from({ length: rows }, (_, i) => `<span style="top:${i * HH + (i ? 0 : 9)}px">${S.dayStart + i}:00</span>`).join('');
-  return `<div class="stick"><div class="cols" style="--n:${n}">${head}</div><div class="cols" style="--n:${n}">${due}</div></div><div class="cols" style="--n:${n};--rows:${rows}"><div class="gut">${gut}</div>${cols}</div>`;
+  return `<div class="stick"><div class="cols" style="--n:${n}">${head}</div>${typeF === 'event' && !anyDue ? '' : `<div class="cols" style="--n:${n}">${due}</div>`}</div><div class="cols" style="--n:${n};--rows:${rows}"><div class="gut">${gut}</div>${cols}</div>`;
 }
 
 // A month day: up to `max` chips, same-title ones merged into a counted pill, then "+N more".
