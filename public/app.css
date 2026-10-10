@@ -308,7 +308,7 @@ a.btn{text-decoration:none;align-self:flex-start}
 .scard .chk{margin-top:0}
 
 /* history page */
-#history{max-width:860px}
+#history,#bin{max-width:1100px;margin:0}
 .hstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .hstat{padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 .hstat b{display:block;font-size:26px;line-height:1.1;letter-spacing:-.02em}
@@ -330,7 +330,6 @@ a.btn{text-decoration:none;align-self:flex-start}
 @media(max-width:820px){.hstats{grid-template-columns:1fr}}
 
 /* bin */
-#bin{max-width:860px}
 #bin .hbar .note{margin:0;max-width:560px}
 .binact{display:flex;align-items:center;gap:8px;align-self:center;flex:none}
 .binrow{cursor:default}
