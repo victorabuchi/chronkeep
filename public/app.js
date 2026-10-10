@@ -31,6 +31,7 @@ let P = { name: '', email: '', phone: '', photo: '' };
 let trash = [];
 let sec = { lan: false, hasPin: false, urls: [] };
 let macStatus = 'unknown';
+let feeds = [];
 let page = ['tasks', 'settings', 'customize', 'history', 'bin'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true, calShown = false, navDir = 0;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
@@ -154,7 +155,7 @@ function renderGrid(days) {
     due += `<div class="due ${t ? 'today' : ''}" data-drop="${ymd(d)}">${dueList.map((it) => chip(it, d)).join('')}</div>`;
     let evs = lanes(timed).map((ev) => {
       const c = color(ev.it.category), w = 100 / ev.n;
-      return `<div class="ev" data-id="${ev.it.id}" data-d="${ymd(d)}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${ev.it.time}${ev.it.endTime ? ' to ' + ev.it.endTime : ''}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}<i class="rz" aria-hidden="true"></i></div>`;
+      return `<div class="ev" data-id="${ev.it.id}" data-d="${ymd(d)}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${ev.it.time}${ev.it.endTime ? ' to ' + ev.it.endTime : ''}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.location ? `<div class="sb">${esc(ev.it.location)}</div>` : ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}<i class="rz" aria-hidden="true"></i></div>`;
     }).join('');
     if (t) { const m = now.getHours() * 60 + now.getMinutes(); if (m >= top0 && m <= S.dayEnd * 60) evs += `<div class="nowline" style="top:${((m - top0) / 60) * HH}px"></div>`; }
     cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
@@ -316,7 +317,7 @@ function setType(t, fresh) {
   document.querySelectorAll('#fType button').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
   $('fDateL').textContent = t === 'assignment' ? 'Due date' : t === 'event' ? 'Date' : 'Date (optional)';
   $('fTimeL').textContent = t === 'assignment' ? 'Due time' : t === 'event' ? 'Start time' : 'Time (optional)';
-  $('fEndWrap').hidden = t !== 'event';
+  $('fEndWrap').hidden = t !== 'event'; $('fLocWrap').hidden = t !== 'event';
   if (fresh && !remTouched) { fRem = [...(S.reminderDefaults[t] || [])]; chipSet($('fRem'), fRem, () => (remTouched = true)); fNud = (S.nudgeDefaults[t] || []).map((r) => ({ ...r })); nudgeEditor($('fNud'), fNud, () => (remTouched = true)); }
   if (fresh && t === 'assignment' && !$('fTime').value && !editing) $('fTime').value = S.dueTime;
 }
@@ -326,7 +327,8 @@ function openForm(it, preset = {}) {
   $('fCat').innerHTML = '<option value="">None</option>' + S.categories.map((c) => `<option>${esc(c.name)}</option>`).join('');
   $('fTitle').value = it?.title || ''; $('fCat').value = it?.category || preset.category || '';
   $('fDate').value = it ? it.date : preset.date || ymd(cur); $('fTime').value = it ? it.time || '' : preset.time || '';
-  $('fEnd').value = it?.endTime || preset.endTime || ''; $('fRepeat').value = it?.repeat || 'none'; $('fNotes').value = it?.notes || '';
+  $('fEnd').value = it?.endTime || preset.endTime || ''; $('fLoc').value = it?.location || '';
+  $('fSource').hidden = !(it && it.source); if (it && it.source) $('fSource').textContent = `From a calendar${feeds.find((f) => f.id === it.source.feed) ? ': ' + feeds.find((f) => f.id === it.source.feed).name : ''}. When that calendar changes, it overwrites the title, time and place here. Your reminders and course stay as you set them.`; $('fRepeat').value = it?.repeat || 'none'; $('fNotes').value = it?.notes || '';
   fRem = it ? [...(it.reminders || [])] : [];
   chipSet($('fRem'), fRem, () => (remTouched = true));
   fNud = it ? (it.nudges || []).map((r) => ({ ...r })) : [];
@@ -339,7 +341,7 @@ $('fType').onclick = (e) => { const b = e.target.closest('button'); if (b) setTy
 $('form').onsubmit = async () => {
   let time = $('fTime').value;
   if (fType === 'assignment' && $('fDate').value && !time) time = S.dueTime;
-  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, notes: $('fNotes').value };
+  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', location: fType === 'event' ? $('fLoc').value.trim() : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, notes: $('fNotes').value };
   if (editing) Object.assign(editing, await api('PUT', '/api/items/' + editing.id, body));
   else items.push(await api('POST', '/api/items', body));
   render();
@@ -358,6 +360,49 @@ function drawCats() {
   $('sCats').querySelectorAll('input').forEach((el) => (el.oninput = () => (cats[el.dataset.i][el.dataset.k] = el.value)));
   $('sCats').querySelectorAll('[data-x]').forEach((el) => (el.onclick = () => { cats.splice(el.dataset.x, 1); drawCats(); }));
 }
+// Calendars: links to follow, files to import.
+const ago2 = (ms) => (ms ? ago(ms) : 'never');
+async function reloadState() { const st = await api('GET', '/api/state'); S = norm(st.settings); items = st.items; trash = st.trash || []; render(); }
+async function loadFeeds() {
+  feeds = await api('GET', '/api/feeds');
+  $('feedCat').innerHTML = S.categories.map((c) => `<option ${c.name === 'Timetable' ? 'selected' : ''}>${esc(c.name)}</option>`).join('') + (S.categories.some((c) => c.name === 'Timetable') ? '' : '<option selected>Timetable</option>');
+  $('feedList').innerHTML = feeds.length ? feeds.map((f) => `<div class="brow" data-fid="${f.id}"><span><b>${esc(f.name)}</b><small style="${f.lastError ? 'color:var(--neg)' : ''}">${f.lastError ? esc(f.lastError) : `${f.count} event${f.count === 1 ? '' : 's'} · synced ${ago2(f.lastSync)} · ${esc(f.category || 'no course')}`}</small></span><span class="binact"><button type="button" class="btn ghost sm" data-sync>Sync</button><button type="button" class="btn ghost sm danger" data-drop>Remove</button></span></div>`).join('') : '<p class="note">No calendar links yet.</p>';
+}
+const syncText = (r) => (r.created || r.updated || r.removed ? `${r.created} added, ${r.updated} updated, ${r.removed} removed` : 'Already up to date');
+$('feedAdd').onclick = async () => {
+  const body = { name: $('feedName').value, url: $('feedUrl').value, category: $('feedCat').value };
+  $('feedAdd').disabled = true; flash($('feedMsg'), 'Adding…');
+  const r = await fetch('/api/feeds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), d = await r.json();
+  $('feedAdd').disabled = false;
+  if (!r.ok) return flash($('feedMsg'), d.error || 'Could not add that.', true);
+  $('feedName').value = ''; $('feedUrl').value = ''; flash($('feedMsg'), '');
+  toast(`${d.feed.name}: ${d.result.created} event${d.result.created === 1 ? '' : 's'} added`);
+  await reloadState(); await loadFeeds();
+};
+$('feedList').addEventListener('click', async (e) => {
+  const row = e.target.closest('[data-fid]'); if (!row) return;
+  const f = feeds.find((x) => x.id === row.dataset.fid);
+  if (e.target.closest('[data-sync]')) {
+    const b = e.target.closest('button'); b.disabled = true; b.textContent = 'Syncing…';
+    const r = await fetch(`/api/feeds/${f.id}/sync`, { method: 'POST' }), d = await r.json();
+    toast(r.ok ? `${f.name}: ${syncText(d.result)}` : `${f.name}: ${d.error}`);
+    await reloadState(); return loadFeeds();
+  }
+  if (e.target.closest('[data-drop]')) {
+    if (!confirm(`Stop following "${f.name}"?`)) return;
+    const withEvents = f.count > 0 && confirm(`Also remove the ${f.count} events imported from it?\n\nOK removes them. Cancel keeps them as normal events.`);
+    await fetch(`/api/feeds/${f.id}?events=${withEvents ? 'remove' : 'keep'}`, { method: 'DELETE' });
+    await reloadState(); await loadFeeds(); toast(withEvents ? 'Calendar and its events removed' : 'Calendar removed, events kept');
+  }
+});
+$('icsFile').onchange = async (e) => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, ics: await file.text(), category: $('feedCat').value }) }), d = await r.json();
+  if (!r.ok) return flash($('feedMsg'), d.error || 'Could not import that file.', true);
+  toast(`${file.name}: ${syncText(d)}`); await reloadState();
+};
+
 // Who can open ChronKeep: this computer only, or other devices with a PIN.
 function fillSecurity() {
   $('secLan').checked = sec.lan; $('secLan').disabled = !sec.hasPin; $('secPin').value = ''; $('secPin').placeholder = sec.hasPin ? 'New PIN to change it' : 'Choose a PIN';
@@ -410,7 +455,7 @@ function fillCustomize() {
   nudgeEditor($('sNudA'), nudA); nudgeEditor($('sNudE'), nudE); nudgeEditor($('sNudT'), nudT);
   cats = S.categories.map((c) => ({ ...c })); drawCats();
   $('customMsg').textContent = '';
-  fillSecurity(); fillAutostart(); fillMacNote();
+  fillSecurity(); fillAutostart(); fillMacNote(); loadFeeds();
 }
 $('mSettings').onclick = () => { $('userMenu').hidden = true; setPage('customize'); };
 // Type a hex code and the colour loads at once; nothing is saved until Save.
@@ -840,7 +885,7 @@ function drawSearch() {
   if (!t) { box.hidden = true; return; }
   const words = t.split(/\s+/), today = new Date().setHours(0, 0, 0, 0);
   sList = items
-    .filter((it) => { const hay = `${it.title} ${it.notes} ${it.category} ${KIND[it.type]} ${it.date}`.toLowerCase(); return words.every((w) => hay.includes(w)); })
+    .filter((it) => { const hay = `${it.title} ${it.notes} ${it.location || ''} ${it.category} ${KIND[it.type]} ${it.date}`.toLowerCase(); return words.every((w) => hay.includes(w)); })
     .sort((a, b) => (!!a.done - !!b.done) || Math.abs(day(a.date || '2100-01-01') - today) - Math.abs(day(b.date || '2100-01-01') - today))
     .slice(0, 8);
   sIdx = Math.min(sIdx, Math.max(0, sList.length - 1));

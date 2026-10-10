@@ -10,6 +10,8 @@ const PORT = process.env.PORT || 3000;
 const store = require('./lib/store');
 const auth = require('./lib/auth');
 const autostart = require('./lib/autostart');
+const ics = require('./lib/ics');
+const calsync = require('./lib/calsync');
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
 const PUBLIC = path.join(__dirname, 'public');
 
@@ -55,6 +57,8 @@ const defaults = () => ({
   lastDigest: '',
   nudged: {},
   snoozed: {},
+  feeds: [], // calendar links to follow. The links hold private tokens, so the page only ever gets masked copies.
+  ignored: [], // imported events you deleted, so a sync does not bring them back
   notepad: { html: '', at: null },
 });
 
@@ -65,6 +69,7 @@ function normalize(saved) {
   out.security = { ...d.security, ...out.security };
   if (!out.security.actionSecret) out.security.actionSecret = crypto.randomBytes(24).toString('hex');
   out.snoozed = out.snoozed || {};
+  out.feeds = out.feeds || []; out.ignored = out.ignored || [];
   // The name used to live in settings; the profile now holds it.
   out.profile = { ...d.profile, ...out.profile };
   if (!out.profile.name && out.settings.userName) out.profile.name = out.settings.userName;
@@ -244,6 +249,26 @@ function prime(item) {
   }
 }
 
+// ---- calendar links and files ----
+const publicFeed = (f) => { let host = ''; try { host = new URL(f.url).host; } catch {} return { id: f.id, name: f.name, category: f.category, enabled: f.enabled !== false, lastSync: f.lastSync || 0, lastError: f.lastError || '', count: f.count || 0, host }; };
+const syncing = new Set();
+const ensureCategory = (name) => { if (name && !db.settings.categories.some((c) => c.name === name)) db.settings.categories.push({ name, color: '#0e8fb0' }); };
+// Downloads one calendar link and brings its events into the planner.
+async function syncFeed(feed) {
+  if (syncing.has(feed.id)) return { created: 0, updated: 0, removed: 0 };
+  syncing.add(feed.id);
+  try {
+    const text = await calsync.fetchCalendar(feed.url);
+    const res = calsync.importText(db, { id: feed.id, category: feed.category }, text, { prime, today: ymd(new Date()), reminders: db.settings.reminderDefaults.event || [] });
+    feed.lastSync = Date.now(); feed.lastError = ''; feed.count = db.items.filter((i) => i.source && i.source.feed === feed.id).length;
+    save();
+    return res;
+  } catch (e) {
+    feed.lastSync = Date.now(); feed.lastError = e.message; save();
+    throw e;
+  } finally { syncing.delete(feed.id); }
+}
+
 // What is still to come: one-off reminders, the next repeating reminder per item,
 // overdue nags and the morning summary. Mirrors the rules tick() follows.
 function upcoming() {
@@ -297,6 +322,7 @@ function upcoming() {
 function tick() {
   const now = new Date();
   store.dailyBackup(DATA);
+  for (const f of db.feeds) if (f.enabled !== false && Date.now() - (f.lastSync || 0) > 6 * 3600000) syncFeed(f).catch((e) => console.error(`Calendar "${f.name}":`, e.message));
   let changed = false;
   const s = db.settings;
 
@@ -377,7 +403,11 @@ tick();
 // ---- http ----
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
-const readBody = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
+const readBody = (req) => new Promise((r) => {
+  let b = '', size = 0;
+  req.on('data', (c) => { size += c.length; if (size > 12 * 1024 * 1024) { req.destroy(); return r({}); } b += c; });
+  req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } });
+});
 
 const tries = auth.limiter();
 const secInfo = () => ({ lan: db.security.lan, hasPin: !!db.security.pin, urls: db.security.lan ? auth.lanUrls(PORT) : [] });
@@ -442,6 +472,51 @@ const handler = async (req, res) => {
     } catch (e) { return send(res, 500, { error: e.message }); }
     return;
   }
+  // Calendars: follow links (a timetable, Google Calendar...), import a file, export your own items.
+  if (p === '/api/feeds' && req.method === 'GET') return send(res, 200, db.feeds.map(publicFeed));
+  if (p === '/api/feeds' && req.method === 'POST') {
+    const b = await readBody(req), name = String(b.name || '').trim().slice(0, 60), url = String(b.url || '').trim(), category = String(b.category || '').trim().slice(0, 40);
+    if (!name) return send(res, 400, { error: 'Give the calendar a name.' });
+    const feed = { id: crypto.randomUUID(), name, url, category, enabled: true, lastSync: 0, lastError: '', count: 0 };
+    try { new URL(url); } catch { return send(res, 400, { error: 'That is not a web address.' }); }
+    db.feeds.push(feed);
+    try { const r = await syncFeed(feed); ensureCategory(category); save(); return send(res, 200, { feed: publicFeed(feed), result: r }); }
+    catch (e) { db.feeds = db.feeds.filter((f) => f !== feed); save(); return send(res, 400, { error: e.message }); }
+  }
+  const fm = p.match(/^\/api\/feeds\/([\w-]+)(\/sync)?$/);
+  if (fm) {
+    const feed = db.feeds.find((f) => f.id === fm[1]);
+    if (!feed) return send(res, 404, {});
+    if (fm[2] && req.method === 'POST') {
+      try { return send(res, 200, { feed: publicFeed(feed), result: await syncFeed(feed) }); } catch (e) { return send(res, 502, { error: e.message, feed: publicFeed(feed) }); }
+    }
+    if (!fm[2] && req.method === 'PUT') {
+      const b = await readBody(req);
+      if ('name' in b) feed.name = String(b.name).trim().slice(0, 60) || feed.name;
+      if ('enabled' in b) feed.enabled = !!b.enabled;
+      if ('category' in b) { feed.category = String(b.category).trim().slice(0, 40); ensureCategory(feed.category); for (const it of db.items) if (it.source && it.source.feed === feed.id) it.category = feed.category; }
+      save(); return send(res, 200, publicFeed(feed));
+    }
+    if (!fm[2] && req.method === 'DELETE') {
+      let removed = 0;
+      if (url.searchParams.get('events') === 'remove') { const n = db.items.length; db.items = db.items.filter((i) => !(i.source && i.source.feed === feed.id)); removed = n - db.items.length; }
+      else for (const it of db.items) if (it.source && it.source.feed === feed.id) delete it.source;
+      db.ignored = db.ignored.filter((k) => !k.startsWith(feed.id + '|'));
+      db.feeds = db.feeds.filter((f) => f !== feed); save();
+      return send(res, 200, { ok: true, removed });
+    }
+  }
+  if (p === '/api/import' && req.method === 'POST') {
+    const b = await readBody(req), name = String(b.name || 'calendar').slice(0, 80), category = String(b.category || '').trim().slice(0, 40);
+    try {
+      const r = calsync.importText(db, { id: 'file:' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), category }, String(b.ics || ''), { prime, today: ymd(new Date()), reminders: db.settings.reminderDefaults.event || [] });
+      ensureCategory(category); save(); return send(res, 200, r);
+    } catch (e) { return send(res, 400, { error: e.message }); }
+  }
+  if (p === '/api/calendar.ics' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'attachment; filename="chronkeep.ics"' });
+    return res.end(ics.build(db.items.filter((i) => !i.source), { name: db.settings.name }));
+  }
   if (p === '/api/act' && req.method === 'POST') {
     const b = await readBody(req), r = applyAction(b.itemId, b.date, b.action, b.minutes);
     return send(res, r.error ? 404 : 200, r);
@@ -476,7 +551,7 @@ const handler = async (req, res) => {
   }
   if (p === '/api/export' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="chronkeep-export-${ymd(new Date())}.json"` });
-    return res.end(JSON.stringify({ exportedAt: new Date().toISOString(), profile: db.profile, settings: db.settings, items: db.items, notepad: db.notepad, bin: db.trash }, null, 2));
+    return res.end(JSON.stringify({ exportedAt: new Date().toISOString(), profile: db.profile, settings: db.settings, items: db.items, notepad: db.notepad, bin: db.trash, calendars: db.feeds.map(publicFeed) }, null, 2));
   }
   if (p === '/api/account' && req.method === 'DELETE') {
     const want = db.profile.email || 'DELETE';
@@ -507,6 +582,7 @@ const handler = async (req, res) => {
     if (i < 0) return send(res, 404, {});
     if (tm[2] && req.method === 'POST') {
       const { deletedAt, ...item } = db.trash.splice(i, 1)[0];
+      if (item.source) db.ignored = db.ignored.filter((k) => k !== `${item.source.feed}|${item.source.key}`);
       prime(item); db.items.push(item); save(); return send(res, 200, item);
     }
     if (!tm[2] && req.method === 'DELETE') { db.trash.splice(i, 1); save(); return send(res, 200, { ok: true }); }
@@ -517,7 +593,7 @@ const handler = async (req, res) => {
   }
   if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!', { kind: 'test' }); return send(res, 200, { ok: true }); }
   if (p === '/api/items' && req.method === 'POST') {
-    const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
+    const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', location: '', done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
     prime(it); db.items.push(it); save(); return send(res, 200, it);
   }
   const m = p.match(/^\/api\/items\/([\w-]+)$/);
@@ -530,7 +606,7 @@ const handler = async (req, res) => {
       if (['date', 'time', 'reminders', 'repeat', 'nudges'].some((k) => k in patch)) { db.items[i].lastNag = 0; prime(db.items[i]); }
       save(); return send(res, 200, db.items[i]);
     }
-    if (req.method === 'DELETE') { const [gone] = db.items.splice(i, 1); db.trash.unshift({ ...gone, deletedAt: Date.now() }); db.trash.length = Math.min(db.trash.length, 200); save(); return send(res, 200, db.trash[0]); }
+    if (req.method === 'DELETE') { const [gone] = db.items.splice(i, 1); if (gone.source) db.ignored = [...db.ignored.slice(-4999), `${gone.source.feed}|${gone.source.key}`]; db.trash.unshift({ ...gone, deletedAt: Date.now() }); db.trash.length = Math.min(db.trash.length, 200); save(); return send(res, 200, db.trash[0]); }
   }
   // static
   const f = path.join(PUBLIC, p === '/' ? 'index.html' : p);

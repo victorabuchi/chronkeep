@@ -162,6 +162,17 @@
             <div id="sCats"></div>
             <button type="button" class="btn ghost sm" id="addCat">+ Add course</button>
           </div>
+          <div class="scard" id="calCard">
+            <strong>Calendars</strong>
+            <p class="note">Follow a calendar link (your university timetable, Google Calendar...) and its events appear here and stay up to date. Links are kept on this computer only.</p>
+            <div class="blist" id="feedList"></div>
+            <div class="field">Add a calendar link
+              <input id="feedName" maxlength="60" placeholder="Name, for example UEF timetable">
+              <input id="feedUrl" type="url" placeholder="https://...  (a link ending in .ics, or an iCal link)" spellcheck="false" autocomplete="off">
+              <div class="hexrow"><select id="feedCat"></select><button type="button" class="btn sm" id="feedAdd">Add calendar</button></div>
+            </div>
+            <div class="frm"><label class="btn ghost sm" for="icsFile" style="cursor:pointer">Import a file</label><input type="file" id="icsFile" accept=".ics,text/calendar" hidden><a class="btn ghost sm" href="/api/calendar.ics" download>Export my calendar</a><span class="msg" id="feedMsg" role="status"></span></div>
+          </div>
         </div>
         <div class="sstack">
           <div class="scard">
@@ -218,6 +229,8 @@
   <label class="l">Course</label><select id="fCat"></select>
   <div class="two"><div><label class="l" id="fDateL">Due date</label><input type="date" id="fDate"></div><div><label class="l" id="fTimeL">Due time</label><input type="time" id="fTime"></div></div>
   <div id="fEndWrap" hidden><label class="l">End time</label><input type="time" id="fEnd"></div>
+  <div id="fLocWrap" hidden><label class="l">Location</label><input id="fLoc" maxlength="200" placeholder="Room, building or link"></div>
+  <p class="note" id="fSource" hidden></p>
   <label class="l">Remind me once</label><div class="chips" id="fRem"></div>
   <label class="l">Keep reminding me until it is done</label><div id="fNud"></div>
   <div class="two"><div><label class="l">Repeat</label><select id="fRepeat"><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div></div>
