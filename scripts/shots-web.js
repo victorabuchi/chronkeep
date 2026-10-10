@@ -18,7 +18,7 @@ module.exports.run = async ({ chrome: c, base, OUT, film, sleep }, set = 'deskto
   await fresh();
   await shot('week');
   R('newBtn', await box(`document.querySelector('#btnAdd')`));
-  R('roboticsChip', await box(byText('.chip', 'Robotics report')));
+  R('roboticsChip', await box(byText('.ev.asg, .chip, .dpill', 'Robotics report')));
   R('monthBtn', await box(`document.querySelector('[data-v="month"]')`));
   R('lectureEv', await box(byText('.ev', 'Web Programming seminar')));
   R('bell', await box(`document.querySelector('#btnBell')`));
@@ -28,7 +28,7 @@ module.exports.run = async ({ chrome: c, base, OUT, film, sleep }, set = 'deskto
   await shot('month');
 
   // opening a deadline
-  await fresh(`${byText('.chip', 'Robotics report')}.click()`);
+  await fresh(`${byText('.ev.asg, .chip, .dpill', 'Robotics report')}.click()`);
   await shot('edit');
   R('dlgSave', await box(`document.querySelector('#form button:not([type=button])')`));
   R('dlgCancel', await box(`document.querySelector('#fCancel')`));
