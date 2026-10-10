@@ -27,10 +27,11 @@ async function launch(port = 9333) {
       const off = when.getTime() - Date.now();
       await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { const R = Date, off = ${off}; class D extends R { constructor(...a) { a.length ? super(...a) : super(R.now() + off); } static now() { return R.now() + off; } } window.Date = D; })();` });
     },
+    async transparent() { await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } }); },
     async viewport(w, h, dpr = 2, mobile = false) { await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: dpr, mobile }); },
     async goto(url) { await send('Page.navigate', { url }); await sleep(900); },
     async eval(expr) { const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result.value; },
-    async shot(file, { format = 'png', quality } = {}) { const r = await send('Page.captureScreenshot', { format, ...(quality ? { quality } : {}), fromSurface: true }); fs.writeFileSync(file, Buffer.from(r.data, 'base64')); },
+    async shot(file, { format = 'png', quality, clip } = {}) { const r = await send('Page.captureScreenshot', { format, ...(quality ? { quality } : {}), ...(clip ? { clip: { ...clip, scale: 1 } } : {}), fromSurface: true }); fs.writeFileSync(file, Buffer.from(r.data, 'base64')); },
     // the box of an element, in CSS pixels, for pointing the film's cursor at it
     async rect(selector) { return api.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }; })()`); },
     sleep,
