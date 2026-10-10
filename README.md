@@ -1,83 +1,73 @@
-<p align="center"><img src="public/logo.png" alt="ChronKeep" width="320"></p>
+<p align="center"><img src="public/wordmark.png" alt="ChronKeep" width="300"></p>
 
-# ChronKeep
+A calendar and to-do list that keeps reminding you until the assignment is done. On the web and on your phone, always in sync. Built for people who miss deadlines.
 
-A personal calendar and to-do list that keeps reminding you until the work is done. Built for people who miss deadlines.
+## `Tech stack`
 
-- **Search:** find any item on any date from the top bar (press `/`).
-- **Type it naturally:** "Robotics report due Sunday 11pm #study" in the sidebar box or the search bar becomes an assignment with the right date, time, course and reminders. Dates like `tomorrow`, `next friday`, `12 oct`, `12.10.`, `in 3 days` and times like `5pm`, `23:59`, `noon` work, and `every monday` makes it repeat.
-- **Repeats done properly:** end a repeat on a date, skip a single day, or change only one occurrence (it becomes its own item). Events can run past midnight or over several days.
-- **Task detail:** priority (high priority also arrives as urgent on your phone), steps with progress that you can tick from the Tasks page, and file attachments up to 10 MB each, kept on this computer next to your data.
-- **Calendar:** month, week and day views, with assignments, events and to-dos in one place.
-- **Tasks page:** everything you owe, grouped as overdue, today, tomorrow, this week and later. Tick items off as you go.
-- **History:** completed assignments and to-dos (with "on time" or "2 h late" badges and an Undo) and past events, with a 30-day summary.
-- **Bin:** deleted tasks and events wait here for 30 days. Restore them, delete them for good, or undo straight from the toast.
-- **Reminders that repeat:** one-off reminders ("1 day before") plus repeating rules ("every 30 min from now, then every 10 min on the due day") that continue until you tick the item. Overdue items keep nagging too.
-- **Notifications:** native macOS notifications on your laptop (with Snooze and Done buttons), desktop notifications on Linux and Windows (written but not yet tried on those systems), and push to your phone through [ntfy](https://ntfy.sh).
-- **Note:** a floating note with checklists, tables and text styles, always one click away in the top bar.
-- **Settings:** profile picture, name, email and phone, a one-click export of your data, and delete account.
-- **Customisable:** the Customize page changes the accent colour (type any hex code), theme, courses and colours, day hours and reminder defaults.
+<p align="center">
+  <img src="https://img.shields.io/badge/-JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black">
+  <img src="https://img.shields.io/badge/-Node.js-5FA04E?style=flat&logo=nodedotjs&logoColor=white">
+  <img src="https://img.shields.io/badge/-PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white">
+  <img src="https://img.shields.io/badge/-Supabase-3FCF8E?style=flat&logo=supabase&logoColor=white">
+  <img src="https://img.shields.io/badge/-Render-46E3B7?style=flat&logo=render&logoColor=black">
+  <img src="https://img.shields.io/badge/-Expo-000020?style=flat&logo=expo&logoColor=white">
+  <img src="https://img.shields.io/badge/-React_Native-61DAFB?style=flat&logo=react&logoColor=black">
+  <img src="https://img.shields.io/badge/-TypeScript-3178C6?style=flat&logo=typescript&logoColor=white">
+</p>
 
-No dependencies, no build step. Your data stays on your machine in `data.json`.
+The web app and the server are plain JavaScript with one dependency (`pg`). The phone app is in [chronkeep-mobile](https://github.com/victorabuchi/chronkeep-mobile).
 
+## `What it does`
 
-## In the cloud (accounts and sync)
+- **One calendar:** day, week and month. Lessons and events are blocks in the hours. Assignments are blocks too, in their own colour, ending at their due time. To-dos and all-day items sit in a slim DUE strip, and same-title deadlines merge into one counted pill.
+- **Type it like a sentence:** "Robotics report due Sunday 11pm" becomes an assignment on the right day and time, in the right course, with your usual reminders.
+- **Reminders that keep going:** remind once, or keep reminding every few minutes as a deadline gets close, until you tick it off. Reminders are scheduled on the phone, with Snooze and Done on the notification.
+- **Tasks:** everything you owe, grouped by when it is due. The To-do page shows each task as a big card with its notes, steps, reminders and files. An Events tab lists what is coming up.
+- **Follow your timetable:** paste a calendar link (a university timetable, Moodle) and say whether it holds lessons or deadlines. It refreshes by itself every few hours, and a saved link can be renamed or switched later.
+- **The same everywhere:** sign in with email, Google or Apple. Changes, deletions, the bin, settings and files reach every device within about a minute, and offline changes are sent when you are back online.
+- **Also:** history with on-time stats, a 30-day bin, steps and priorities, files up to 10 MB, a floating note with checklists, search with add, light and dark, export and delete account.
 
-Besides the local app, ChronKeep has a cloud edition: `npm run start:cloud` runs `cloud/server.js`, with accounts (email and password, Google, Apple), each person's data in Postgres (Supabase), a landing page, and a sync API the phone app uses so the web and the phone always show the same things. See [docs/SETUP.md](docs/SETUP.md) for deploying it to Render.
-
-
-## Screenshots
+## `Screenshots`
 
 <p align="center"><img src="docs/calendar.png" alt="Week view with the task list" width="860"></p>
 <p align="center"><img src="docs/tasks.png" alt="The Tasks page" width="425"> <img src="docs/calendar-dark.png" alt="Dark mode" width="425"></p>
-<p align="center"><img src="docs/phone.png" alt="On a phone" width="220"></p>
 
-(The screenshots use made-up demo data.)
+(Demo data. The screenshots show an earlier version of the design.)
 
-## Run
+## `Run it`
 
-```
-node server.js        # or: npm start
-```
-
-Open http://localhost:3000. Use `PORT=3001 node server.js` for another port.
-
-## Phone notifications
-
-1. Install the free **ntfy** app.
-2. Subscribe to the topic shown in **Customize** (a random name generated on first run; treat it like a password).
-3. Press **Send test** in Customize.
-
-Reminders only fire while the server is running.
-
-## Mac notifications
-
-Popups come from a small native `ChronKeep.app` (built automatically with Swift into `~/Library/Application Support/ChronKeep/`, rebuild with `./mac/build-notifier.sh`). They show the ChronKeep icon and have **Snooze 10 min** and **Done** buttons; clicking the notification itself opens the item. Without Swift, a simpler version without buttons is built instead. If macOS blocks notifications for ChronKeep, a banner tells you and Customize has a button that opens **System Settings > Notifications**.
-
-On your phone, Snooze and Done buttons appear when other devices can reach your computer (see Access below). They use signed links that expire after a week.
-
-## Layout
-
-```
-server.js          API, scheduler, notifications
-lib/               store (saves, backups), auth, ics, calsync (calendar links), desktop, autostart, assets
-mac/               builds the ChronKeep.app that Mac notifications come from
-public/            the web app
-  index.html, app.css, login.html
-  js/NNN-name.js   the page's script, one file per section, joined into app.js by the server
-  recur.js, quick.js   rules shared with the tests (which days an item appears, typing a sentence)
-  note.js, note.css    the floating note
-test/              node:test suites (run with `npm test`)
-data.json          your data (git-ignored); backups/ and uploads/ sit next to it
+```sh
+npm install
+cp .env.example .env     # DATABASE_URL (Postgres, e.g. Supabase), SESSION_SECRET, APP_URL
+npm run start:cloud      # http://localhost:3100: landing page, sign in, the web app, the sync API
+npm test                 # about 100 tests; the ones that need a database run when TEST_DATABASE_URL is set
 ```
 
-## API
+`node server.js` still runs the original single-person app on port 3000 with no account, if you only want it on your own computer.
 
-The web app talks to a small JSON API, documented in [docs/API.md](docs/API.md) (access rules, the item format, every endpoint, and what a mobile client would still need).
+## `Deploy`
 
-## Development
+The Render blueprint is `render.yaml`. [docs/SETUP.md](docs/SETUP.md) walks through Render, Google and Apple sign-in, and password-reset emails.
 
-No dependencies and no build step. `npm test` runs the suites (about 75 tests, 10 seconds): the calendar and
-recurrence rules, natural-language parsing, storage and recovery, access control, reminders, calendar links,
-attachments and the notification buttons, each against a real server on a spare port with its own temporary data.
-To change the page, edit the section it lives in under `public/js/`.
+## `Layout`
+
+```
+cloud/             accounts, sessions, Google and Apple sign-in, Postgres, pages
+lib/               routes shared by both servers, sync, model, calendar links (ics, calsync), http helpers
+public/            the web app: index.html, app.css, js/NNN-name.js joined into app.js, recur.js, quick.js
+site/              landing page, sign-in styles, the product film (screenshots made by scripts/shots.js)
+scripts/           screenshot tooling, create-user
+test/              node:test suites
+docs/              API reference and the setup guide
+```
+
+The API the web app and the phone app use is described in [docs/API.md](docs/API.md).
+
+## `Contact`
+
+<p align="center">
+  <a href="https://www.linkedin.com/in/victor-abuchi-06b086338"><img src="https://img.shields.io/badge/-LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white"></a>
+  <a href="mailto:contact@victorabuchi.com"><img src="https://img.shields.io/badge/-Email-EA4335?style=flat&logo=gmail&logoColor=white"></a>
+  <a href="https://victorabuchi.com"><img src="https://img.shields.io/badge/-Website-111827?style=flat&logo=safari&logoColor=white"></a>
+  <a href="https://github.com/victorabuchi"><img src="https://img.shields.io/badge/-GitHub-444444?style=flat&logo=github"></a>
+</p>
