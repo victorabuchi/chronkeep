@@ -552,3 +552,29 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .trow .ti .cnt{display:inline-block;min-width:20px;margin-left:4px;padding:0 6px;border-radius:999px;background:var(--b);color:#fff;font-size:11px;font-weight:800;line-height:18px;text-align:center;vertical-align:1px}
 
 .due .dpill{margin:0;align-self:stretch;width:auto;max-width:100%}
+
+/* To-do cards: the whole task, big, on a full page */
+.tlist.cards{display:block!important;overflow:visible}
+.tgroup{margin-bottom:22px}
+.tgroup .grp{margin:0 4px 10px}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+.trow.tcard{display:flex;flex-direction:column;gap:12px;padding:18px 18px 16px;border:1px solid var(--line);border-radius:16px;background:var(--card);border-top:4px solid var(--c);transition:box-shadow .2s,transform .2s}
+.trow.tcard:hover{box-shadow:0 14px 34px -18px rgba(20,24,31,.35);transform:translateY(-1px)}
+.trow.tcard.late{border-color:var(--neg-line);border-top-color:var(--neg);background:color-mix(in srgb,var(--neg-bg) 45%,var(--card))}
+.trow.tcard.done{opacity:.6}.trow.tcard.done h3{text-decoration:line-through}
+.tcard .chead{display:flex;gap:14px;align-items:flex-start}
+.circle.big{flex:none;width:30px;height:30px;border-width:2.5px;margin-top:2px}
+.circle.big.on::after{width:14px;height:8px;border-width:0 0 3px 3px}
+.tcard h3{margin:0;font-size:18px;line-height:1.25;letter-spacing:-.015em;overflow-wrap:anywhere}
+.tcard .cmeta{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:600;align-items:center}
+.tcard .cdue b{color:var(--ink)}.tcard .cdue.late{color:var(--neg)}.tcard .cdue.soon{color:var(--warn)}
+.tcard .cnotes{margin:0;padding:10px 12px;border-radius:10px;background:var(--soft);font-size:13.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.tcard .cprog{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--muted)}
+.tcard .cprog i{flex:1;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}.tcard .cprog b{display:block;height:100%;border-radius:3px;background:var(--c);transition:width .3s}
+.tcard .subs{display:grid;gap:6px}
+.tcard .substep{display:flex;gap:10px;align-items:center;font-size:14px;padding:4px 0}
+.tcard .substep.done span{text-decoration:line-through;color:var(--muted)}
+.tcard .cfact{font-size:12.5px;color:var(--ink2)}.tcard .cfact i{display:inline-block;margin-right:8px;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.tcard .cfiles{display:flex;flex-wrap:wrap;gap:6px}
+.tcard .cfile{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;font-weight:600;color:var(--ink);text-decoration:none}
+@media(max-width:640px){.cardgrid{grid-template-columns:1fr}}
