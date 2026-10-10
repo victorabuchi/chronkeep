@@ -417,3 +417,4 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 20px;background:var(--warn-bg);color:var(--warn);border-bottom:1px solid color-mix(in srgb,var(--warn) 30%,var(--line));animation:pageIn .3s ease both}
 .banner b{font-weight:800}
 .banner .bact{display:flex;gap:8px}
+.brow .binact{display:flex;align-items:center;gap:8px}
