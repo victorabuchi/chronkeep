@@ -7,7 +7,7 @@ The cloud server (`cloud/server.js`) gives ChronKeep accounts, keeps each person
 - The database is Supabase. The server creates its tables the first time it connects (the SQL is in `cloud/schema.sql`, safe to run again), with row level security on.
 - Your account exists in that database. To make another, or reset a password, run
   `CK_EMAIL=you@example.com CK_NAME="Your Name" CK_PASSWORD='…' node scripts/create-user.js` (reads `.env`).
-- `.env` (git-ignored) holds your `DATABASE_URL` and a `SESSION_SECRET` for running locally: `npm run start:cloud`, then open http://localhost:3000.
+- `.env` (git-ignored) holds your `DATABASE_URL` and a `SESSION_SECRET` for running locally: `npm run start:cloud`, then open http://localhost:3100.
 
 ## 1. Deploy to Render
 

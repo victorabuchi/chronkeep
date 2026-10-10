@@ -12,7 +12,7 @@
   <nav class="links" aria-label="Main"><a href="#features">Features</a><a href="#how">How it works</a><a href="#everywhere">On your phone</a></nav>
   <span class="grow"></span>
   <span data-guest><a class="btn btn-ghost" href="/login">Log in</a> <a class="btn btn-primary" href="/signup">Start free</a></span>
-  <span data-member hidden><a class="btn btn-primary" href="/app">Open app</a> <button type="button" class="btn btn-ghost" data-signout>Sign out</button></span>
+  <span data-member hidden><a class="btn btn-primary" href="/app">Open app</a> <button type="button" class="btn btn-ghost" data-signout>Log out</button></span>
 </div></header>
 
 <section class="hero" id="top"><div class="aurora" aria-hidden="true"></div><div class="wrap">
@@ -62,7 +62,7 @@ fetch('/api/me').then((r) => r.ok && r.json()).then((me) => {
   document.querySelectorAll('[data-member]').forEach((e) => (e.hidden = false));
   document.querySelectorAll('.cta a[href="/signup"]').forEach((a) => { a.textContent = 'Open your app'; a.href = '/app'; });
   document.querySelectorAll('.cta a[href="/login"]').forEach((a) => (a.hidden = true));
-  document.querySelectorAll('footer a[href="/login"]').forEach((a) => { a.textContent = 'Sign out'; a.href = '#'; a.dataset.signout = ''; });
+  document.querySelectorAll('footer a[href="/login"]').forEach((a) => { a.textContent = 'Log out'; a.href = '#'; a.dataset.signout = ''; });
 }).catch(() => {});
 document.addEventListener('click', async (e) => {
   if (!e.target.closest('[data-signout]')) return;

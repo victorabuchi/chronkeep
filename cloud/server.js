@@ -284,9 +284,11 @@ const handler = async (req, res) => {
 
 async function start() {
   await db.connect();
-  const port = process.env.PORT || 3000;
+  // 3100 here, so it never clashes with the local Mac app on 3000; Render sets PORT itself
+  const port = process.env.PORT || 3100;
   const server = http.createServer(handler);
-  server.listen(port, () => console.log(`ChronKeep cloud on port ${port}`));
+  server.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? `Port ${port} is already in use.` : e.message); process.exit(1); });
+  server.listen(port, () => console.log(`ChronKeep cloud: http://localhost:${port}  (sign in at /login)`));
   return server;
 }
 if (require.main === module) start().catch((e) => { console.error(e); process.exit(1); });
