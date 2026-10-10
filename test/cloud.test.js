@@ -104,6 +104,11 @@ describe('cloud server', { skip }, () => {
     assert.equal((await call('GET', '/api/state', { token })).data.items[0].title, 'Edited on web');
   });
 
+  it('tells the phone which sign-in buttons to show', async () => {
+    const r = await call('GET', '/api/mobile/providers');
+    assert.deepEqual(Object.keys(r.data).sort(), ['apple', 'google']);
+  });
+
   it('signs a phone in by password, and by the browser hand-over', async () => {
     const { email } = await signup();
     const login = await call('POST', '/api/mobile/login', { body: { email, password: 'correct horse battery' } });

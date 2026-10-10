@@ -148,6 +148,8 @@ async function authRoutes(req, res, url) {
 // ---- the phone app's sign-in ----
 async function mobileRoutes(req, res, url) {
   const p = url.pathname;
+  // which sign-in buttons the phone should show
+  if (p === '/api/mobile/providers' && req.method === 'GET') return send(res, 200, { google: auth.googleReady(), apple: auth.appleReady() }), true;
   if (p === '/api/mobile/login' && req.method === 'POST') {
     const b = await readBody(req), email = emailOf(b.email), password = String(b.password || '');
     if (!email || !password) return send(res, 400, { error: 'Enter your email address and password.' }), true;
