@@ -34,6 +34,7 @@
         <div class="who"><b id="userName">Your account</b><small id="userEmail">Personal planner</small></div>
         <button id="mProfile"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Settings</button>
         <button id="mSettings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Customize</button>
+        <button id="mKeys"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7 14h10"/></svg>Keyboard shortcuts</button>
         <button id="mTest"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg>Send test notification</button>
       </div>
     </div>
@@ -201,6 +202,19 @@
 </form></dialog>
 
 
+<dialog id="help"><h3>Keyboard shortcuts</h3>
+  <div class="keys">
+    <div><kbd>n</kbd><span>New item</span></div><div><kbd>/</kbd><span>Search</span></div>
+    <div><kbd>t</kbd><span>Jump to today</span></div><div><kbd>←</kbd> <kbd>→</kbd><span>Previous or next</span></div>
+    <div><kbd>m</kbd> <kbd>w</kbd> <kbd>d</kbd><span>Month, week, day</span></div><div><kbd>?</kbd><span>This help</span></div>
+    <div><kbd>1</kbd><span>Calendar</span></div><div><kbd>2</kbd><span>Tasks</span></div>
+    <div><kbd>3</kbd><span>History</span></div><div><kbd>4</kbd><span>Bin</span></div>
+    <div><kbd>5</kbd><span>Settings</span></div><div><kbd>6</kbd><span>Customize</span></div>
+  </div>
+  <h4>With the mouse</h4>
+  <ul class="tips"><li>Drag on an empty spot in the calendar to create an event for that time span.</li><li>Drag an event to move it, or pull its bottom edge to change how long it lasts.</li><li>Drag a deadline onto another day to reschedule it.</li><li>Every change shows an Undo.</li></ul>
+  <div class="actions"><button type="button" class="btn" id="helpClose">Got it</button></div>
+</dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="note.js"></script>
 <script src="app.js"></script>
