@@ -54,6 +54,7 @@ const defaults = () => ({
   notified: [],
   lastDigest: '',
   nudged: {},
+  snoozed: {},
   notepad: { html: '', at: null },
 });
 
@@ -62,6 +63,8 @@ function normalize(saved) {
   const d = defaults();
   const out = { ...d, ...saved, settings: { ...d.settings, ...(saved && saved.settings) } };
   out.security = { ...d.security, ...out.security };
+  if (!out.security.actionSecret) out.security.actionSecret = crypto.randomBytes(24).toString('hex');
+  out.snoozed = out.snoozed || {};
   // The name used to live in settings; the profile now holds it.
   out.profile = { ...d.profile, ...out.profile };
   if (!out.profile.name && out.settings.userName) out.profile.name = out.settings.userName;
@@ -92,37 +95,95 @@ save();
 const NOTIFIER = path.join(os.homedir(), 'Library/Application Support/ChronKeep/ChronKeep.app');
 const NOTE_FILE = path.join(os.homedir(), 'Library/Caches/ChronKeep/notify.txt');
 let macQueue = Promise.resolve();
+const NATIVE = path.join(NOTIFIER, 'Contents/MacOS/ChronKeep');
+let macStatus = 'unknown'; // 'ok' | 'denied' | 'unknown'
+const oneLine = (t) => String(t).replace(/\s+/g, ' ').trim();
+const runNative = (args) => new Promise((res) => execFile(NATIVE, args, { timeout: 15000 }, (err) => res(err ? (typeof err.code === 'number' ? err.code : 1) : 0)));
+async function checkMac() {
+  if (process.platform !== 'darwin' || !fs.existsSync(NATIVE)) return (macStatus = 'unknown');
+  const c = await runNative(['--check']);
+  return (macStatus = c === 0 ? 'ok' : c === 3 ? 'denied' : 'unknown');
+}
 function plainNotify(title, body) {
   const esc = (t) => String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   execFile('osascript', ['-e', `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`], () => {});
 }
-function macNotify(title, body) {
+// The popup comes from ChronKeep.app (see mac/): our icon, plus Snooze and Done buttons. One at a time.
+// Without it, or if it fails, a plain script notification is used instead.
+function macNotify(title, body, meta = {}) {
   if (process.platform !== 'darwin') return;
-  macQueue = macQueue.then(() => new Promise((done) => {
-    if (!fs.existsSync(NOTIFIER)) { plainNotify(title, body); return done(); }
-    const one = (t) => String(t).replace(/\s+/g, ' ').trim();
-    try {
-      fs.mkdirSync(path.dirname(NOTE_FILE), { recursive: true });
-      fs.writeFileSync(NOTE_FILE, `${one(title)}\n${one(body)}`);
-    } catch { plainNotify(title, body); return done(); }
-    execFile('open', ['-W', '-g', '-a', NOTIFIER], (err) => { if (err) plainNotify(title, body); done(); });
-  }));
+  macQueue = macQueue.then(async () => {
+    if (fs.existsSync(NATIVE)) {
+      const args = ['--title', oneLine(title), '--body', oneLine(body)];
+      if (meta.itemId) args.push('--item', meta.itemId, '--date', meta.date || '', '--port', String(PORT));
+      const code = await runNative(args);
+      if (code === 0) macStatus = 'ok'; else if (code === 3) macStatus = 'denied'; else plainNotify(title, body);
+      return;
+    }
+    if (!fs.existsSync(NOTIFIER)) return plainNotify(title, body);
+    await new Promise((done) => {
+      try { fs.mkdirSync(path.dirname(NOTE_FILE), { recursive: true }); fs.writeFileSync(NOTE_FILE, `${oneLine(title)}\n${oneLine(body)}`); } catch { plainNotify(title, body); return done(); }
+      execFile('open', ['-W', '-g', '-a', NOTIFIER], (err) => { if (err) plainNotify(title, body); done(); });
+    });
+  });
 }
-// Build the notifier app the first time, if this Mac does not have it yet.
-if (process.platform === 'darwin' && !fs.existsSync(NOTIFIER)) execFile('sh', [path.join(__dirname, 'mac', 'build-notifier.sh')], (e) => e && console.error('Could not build the Mac notifier:', e.message));
+// Build the notifier app the first time, or upgrade the simple version when a Swift compiler is available.
+if (process.platform === 'darwin' && (!fs.existsSync(NOTIFIER) || (!fs.existsSync(NATIVE) && fs.existsSync('/usr/bin/swiftc')))) {
+  execFile('sh', [path.join(__dirname, 'mac', 'build-notifier.sh')], (e) => { if (e) console.error('Could not build the Mac notifier:', e.message); checkMac(); });
+} else checkMac();
 
-// kind: reminder | repeat | overdue | summary | test. Every notification is kept in the history.
+// ---- Snooze and Done, from a notification button on the Mac or on the phone ----
+const b64u = (x) => Buffer.from(x).toString('base64url');
+const sign = (p) => crypto.createHmac('sha256', db.security.actionSecret).update(p).digest('base64url').slice(0, 24);
+function actionToken(i, d, a, m) { const p = b64u(JSON.stringify({ i, d, a, m, e: Date.now() + 7 * 86400000 })); return `${p}.${sign(p)}`; }
+function readToken(t) {
+  const [p, sig] = String(t).split('.');
+  if (!p || !sig) return null;
+  const want = Buffer.from(sign(p)), got = Buffer.from(sig);
+  if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return null;
+  try { const o = JSON.parse(Buffer.from(p, 'base64url').toString()); return o.e > Date.now() ? o : null; } catch { return null; }
+}
+function applyAction(itemId, dateStr, action, minutes) {
+  const item = db.items.find((x) => x.id === itemId);
+  if (!item) return { error: 'That item no longer exists.' };
+  const ds = dateStr || item.date || ymd(new Date()), key = `${item.id}@${ds}`;
+  if (action === 'done') {
+    if (item.repeat && item.repeat !== 'none') { item.doneOn = [...new Set([...(item.doneOn || []), ds])]; }
+    else { item.done = true; item.doneAt = Date.now(); }
+    delete db.snoozed[key];
+    db.history.unshift({ at: Date.now(), title: `Done: ${item.title}`, body: 'Marked done from a notification', kind: 'action', itemId: item.id });
+    db.history.length = Math.min(db.history.length, 100); save();
+    return { ok: true, action };
+  }
+  if (action === 'snooze') {
+    const m = Math.max(1, Math.min(1440, Number(minutes) || 10));
+    db.snoozed[key] = Date.now() + m * 60000;
+    db.history.unshift({ at: Date.now(), title: `Snoozed: ${item.title}`, body: `Reminders paused for ${human(m)}`, kind: 'action', itemId: item.id });
+    db.history.length = Math.min(db.history.length, 100); save();
+    return { ok: true, action, until: db.snoozed[key] };
+  }
+  return { error: 'Unknown action.' };
+}
+const isSnoozed = (id, ds) => (db.snoozed[`${id}@${ds}`] || 0) > Date.now();
+
+// Snooze and Done buttons on the phone work when other devices can reach this computer (same Wi-Fi, PIN on).
+function phoneButtons(meta) {
+  const base = db.security.lan ? auth.lanUrls(PORT)[0] : null;
+  if (!meta.itemId || !base) return {};
+  const link = (a, m) => `${base}/api/act/${actionToken(meta.itemId, meta.date || '', a, m)}`;
+  return { Actions: `http, Snooze 10 min, ${link('snooze', 10)}, method=POST, clear=true; http, Done, ${link('done')}, method=POST, clear=true`, Click: `${base}/?open=${meta.itemId}` };
+}
 function notify(title, body, meta = {}) {
   db.history.unshift({ at: Date.now(), title, body, kind: meta.kind || 'reminder', itemId: meta.itemId || null });
   db.history.length = Math.min(db.history.length, 100);
   save();
   console.log(new Date().toLocaleTimeString(), 'notify:', title, '|', body);
   const s = db.settings;
-  if (s.notifyMac) macNotify(title, body);
+  if (s.notifyMac) macNotify(title, body, meta);
   if (s.notifyPhone && s.ntfyTopic) {
     fetch(`${s.ntfyServer.replace(/\/$/, '')}/${encodeURIComponent(s.ntfyTopic)}`, {
       method: 'POST',
-      headers: { Title: title, Priority: 'high', Tags: 'bell', ...(s.notifyIcon ? { Icon: s.notifyIcon } : {}) },
+      headers: { Title: title, Priority: 'high', Tags: 'bell', ...(s.notifyIcon ? { Icon: s.notifyIcon } : {}), ...phoneButtons(meta) },
       body,
     }).catch((e) => console.error('ntfy failed:', e.message));
   }
@@ -221,6 +282,10 @@ function upcoming() {
       if (due < nowMs && nowMs - due < 14 * 86400000) out.push({ at: Math.max(nowMs, (item.lastNag || due) + s.nagHours * 3600000), title: `OVERDUE: ${item.title}`, body: `Reminding every ${human(s.nagHours * 60)} until you tick it off`, kind: 'overdue', itemId: item.id });
     }
   }
+  for (const [key, until] of Object.entries(db.snoozed)) {
+    const it = db.items.find((x) => x.id === key.split('@')[0]);
+    if (it) out.push({ at: until, title: `${label(it)}: ${it.title}`, body: 'Snooze ends', kind: 'reminder', itemId: it.id });
+  }
   if (s.digestHour >= 0) {
     const t = new Date(now); t.setHours(s.digestHour, 0, 0, 0);
     if (t.getTime() <= nowMs || db.lastDigest === ymd(now)) t.setDate(t.getDate() + 1);
@@ -235,12 +300,20 @@ function tick() {
   let changed = false;
   const s = db.settings;
 
+  // A snooze that has run out: remind again.
+  for (const [key, until] of Object.entries(db.snoozed)) {
+    if (until > now.getTime()) continue;
+    const [id, ds] = key.split('@'), it = db.items.find((x) => x.id === id);
+    delete db.snoozed[key]; changed = true;
+    if (it && !isDoneOn(it, new Date(ds + 'T00:00'))) notify(`${label(it)}: ${it.title}`, 'Your snooze is over.', { kind: 'reminder', itemId: id, date: ds });
+  }
+
   for (const item of db.items) {
     if (!item.date) continue;
     // Reminders before the due time.
     for (let off = -1; off <= 8; off++) {
       const d = new Date(now); d.setDate(d.getDate() + off);
-      if (!occursOn(item, d) || isDoneOn(item, d)) continue;
+      if (!occursOn(item, d) || isDoneOn(item, d) || isSnoozed(item.id, ymd(d))) continue;
       const at = atOn(item, d);
       for (const rem of item.reminders || []) {
         const key = `${item.id}@${ymd(d)}@${rem}`;
@@ -248,7 +321,7 @@ function tick() {
         const fire = at.getTime() - rem * 60000;
         if (now.getTime() >= fire && now.getTime() < at.getTime() + 3600000) {
           const when = `${ymd(d) === ymd(now) ? 'today' : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ' at ' + item.time : ''}`;
-          notify(`${label(item)}: ${item.title}`, `${rem > 0 ? `Due in ${lead(rem)}` : 'Due now'} (${when})${item.category ? ', ' + item.category : ''}`, { kind: 'reminder', itemId: item.id });
+          notify(`${label(item)}: ${item.title}`, `${rem > 0 ? `Due in ${lead(rem)}` : 'Due now'} (${when})${item.category ? ', ' + item.category : ''}`, { kind: 'reminder', itemId: item.id, date: ymd(d) });
           db.notified.push(key); changed = true;
         }
       }
@@ -260,21 +333,22 @@ function tick() {
         if (!occursOn(item, d) || isDoneOn(item, d)) continue;
         const due = atOn(item, d), rule = activeRule(item, due, now);
         if (!rule) continue;
+        if (isSnoozed(item.id, ymd(d))) break;
         const key = `${item.id}@${ymd(d)}`;
         if (now.getTime() - (db.nudged[key] || 0) >= rule.every * 60000 - 2000) {
           const left = (due - now) / 60000;
-          notify(`${label(item)}: ${item.title}`, `Due in ${human(left)} (${due.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ', ' + item.time : ''}). Reminding every ${human(rule.every)}. Tick it off to stop.`, { kind: 'repeat', itemId: item.id });
+          notify(`${label(item)}: ${item.title}`, `Due in ${human(left)} (${due.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ', ' + item.time : ''}). Reminding every ${human(rule.every)}. Tick it off to stop.`, { kind: 'repeat', itemId: item.id, date: ymd(d) });
           db.nudged[key] = now.getTime(); changed = true;
         }
         break;
       }
     }
     // Overdue and still not ticked: keep nagging.
-    if (s.nagHours > 0 && (item.repeat === 'none' || !item.repeat) && !item.done && item.type !== 'event') {
+    if (s.nagHours > 0 && (item.repeat === 'none' || !item.repeat) && !item.done && item.type !== 'event' && !isSnoozed(item.id, item.date)) {
       const due = atOn(item, new Date(item.date + 'T00:00'));
       const since = now.getTime() - due.getTime();
       if (since > 0 && since < 14 * 86400000 && now.getTime() - (item.lastNag || due.getTime()) >= s.nagHours * 3600000) {
-        notify(`OVERDUE: ${item.title}`, `${label(item)} was due ${due.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. Tick it off in the planner when done.`, { kind: 'overdue', itemId: item.id });
+        notify(`OVERDUE: ${item.title}`, `${label(item)} was due ${due.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. Tick it off in the planner when done.`, { kind: 'overdue', itemId: item.id, date: item.date });
         item.lastNag = now.getTime(); changed = true;
       }
     }
@@ -315,6 +389,14 @@ const handler = async (req, res) => {
   if (!auth.hostAllowed(req.headers.host, db.security.lan)) { res.writeHead(421); return res.end('Unexpected host'); }
   // 2. Changes must come from this app's own pages, never from another site.
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin && !auth.sameOrigin(req.headers.origin, req.headers.host)) { res.writeHead(403); return res.end('Cross-site request refused'); }
+  // The Snooze / Done links on a phone notification carry their own signature, so they need no sign-in.
+  const am = p.match(/^\/api\/act\/([\w.-]+)$/);
+  if (am && (req.method === 'POST' || req.method === 'GET')) {
+    const o = readToken(am[1]);
+    if (!o) return send(res, 400, { error: 'This link has expired.' });
+    const r = applyAction(o.i, o.d, o.a, o.m);
+    return send(res, r.error ? 404 : 200, r);
+  }
   // 3. Other devices need the PIN. This computer does not.
   const token = auth.cookies(req.headers.cookie).ck;
   const signedIn = local || (token && db.security.sessions.includes(auth.sha(token)));
@@ -360,12 +442,17 @@ const handler = async (req, res) => {
     } catch (e) { return send(res, 500, { error: e.message }); }
     return;
   }
+  if (p === '/api/act' && req.method === 'POST') {
+    const b = await readBody(req), r = applyAction(b.itemId, b.date, b.action, b.minutes);
+    return send(res, r.error ? 404 : 200, r);
+  }
+  if (p === '/api/mac-status' && req.method === 'GET') return send(res, 200, { status: await checkMac() });
   if (p === '/api/logout' && req.method === 'POST') {
     if (token) db.security.sessions = db.security.sessions.filter((h) => h !== auth.sha(token)); save();
     res.setHeader('Set-Cookie', 'ck=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
     return send(res, 200, { ok: true });
   }
-  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile, trash: db.trash, security: secInfo() });
+  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile, trash: db.trash, security: secInfo(), mac: macStatus });
   if (p === '/api/profile' && req.method === 'PUT') {
     const b = await readBody(req), next = { ...db.profile };
     if ('name' in b) next.name = String(b.name).trim().slice(0, 80);

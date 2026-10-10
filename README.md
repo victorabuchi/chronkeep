@@ -35,7 +35,9 @@ Reminders only fire while the server is running.
 
 ## Mac notifications
 
-Popups come from a tiny `ChronKeep.app` (built automatically on first run into `~/Library/Application Support/ChronKeep/`), so they show the ChronKeep icon rather than Script Editor's scroll. Rebuild it any time with `./mac/build-notifier.sh`. If a popup does not appear, check **System Settings > Notifications > ChronKeep** is allowed. macOS silently discards notifications from an app that was denied permission, and the server log cannot tell. Customize has a button that opens that pane.
+Popups come from a small native `ChronKeep.app` (built automatically with Swift into `~/Library/Application Support/ChronKeep/`, rebuild with `./mac/build-notifier.sh`). They show the ChronKeep icon and have **Snooze 10 min** and **Done** buttons; clicking the notification itself opens the item. Without Swift, a simpler version without buttons is built instead. If macOS blocks notifications for ChronKeep, a banner tells you and Customize has a button that opens **System Settings > Notifications**.
+
+On your phone, Snooze and Done buttons appear when other devices can reach your computer (see Access below). They use signed links that expire after a week.
 
 ## Layout
 

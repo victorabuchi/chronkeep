@@ -30,6 +30,7 @@ let S = norm({}), items = [], notepad = { html: '', at: null };
 let P = { name: '', email: '', phone: '', photo: '' };
 let trash = [];
 let sec = { lan: false, hasPin: false, urls: [] };
+let macStatus = 'unknown';
 let page = ['tasks', 'settings', 'customize', 'history', 'bin'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true, calShown = false, navDir = 0;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
@@ -376,6 +377,12 @@ $('secOut').onclick = () => setSecurity({ signOutOthers: true }, 'Signed out');
 $('secRemove').onclick = () => { if (confirm('Remove the PIN? Other devices will lose access.')) setSecurity({ pin: null }, 'PIN removed'); };
 
 // Start with the Mac (a launch agent). Turning it on from a hand-started server makes that server hand over and restart.
+async function fillMacNote() {
+  try { macStatus = (await api('GET', '/api/mac-status')).status; } catch {}
+  showBanner();
+  $('macNote').textContent = macStatus === 'ok' ? 'macOS is allowing ChronKeep notifications.' : macStatus === 'denied' ? 'macOS is blocking ChronKeep notifications. Press the button above and allow ChronKeep.' : '';
+  $('macNote').style.color = macStatus === 'denied' ? 'var(--neg)' : '';
+}
 async function fillAutostart() {
   const st = await api('GET', '/api/autostart');
   $('autoCard').hidden = !st.supported; $('autoOn').checked = st.enabled;
@@ -403,7 +410,7 @@ function fillCustomize() {
   nudgeEditor($('sNudA'), nudA); nudgeEditor($('sNudE'), nudE); nudgeEditor($('sNudT'), nudT);
   cats = S.categories.map((c) => ({ ...c })); drawCats();
   $('customMsg').textContent = '';
-  fillSecurity(); fillAutostart();
+  fillSecurity(); fillAutostart(); fillMacNote();
 }
 $('mSettings').onclick = () => { $('userMenu').hidden = true; setPage('customize'); };
 // Type a hex code and the colour loads at once; nothing is saved until Save.
@@ -494,7 +501,7 @@ document.addEventListener('keydown', (e) => {
 });
 // ---------------------------------------------------------------- notification centre
 let nTab = 'upcoming', nData = { history: [], upcoming: [] };
-const KINDS = { reminder: ['Reminder', 'var(--b)'], repeat: ['Repeating', '#8b5cf6'], overdue: ['Overdue', 'var(--neg)'], summary: ['Summary', 'var(--warn)'], test: ['Test', 'var(--muted)'] };
+const KINDS = { action: ['Action', 'var(--pos)'], reminder: ['Reminder', 'var(--b)'], repeat: ['Repeating', '#8b5cf6'], overdue: ['Overdue', 'var(--neg)'], summary: ['Summary', 'var(--warn)'], test: ['Test', 'var(--muted)'] };
 function whenText(ms) {
   const d = new Date(ms), now = new Date(), diff = ms - now.getTime();
   if (Math.abs(diff) < 3600000) { const m = Math.round(Math.abs(diff) / 60000); return diff < 0 ? (m < 1 ? 'just now' : `${m} min ago`) : (m < 1 ? 'now' : `in ${m} min`); }
@@ -859,12 +866,31 @@ $('q').addEventListener('keydown', (e) => {
 $('sres').addEventListener('mousedown', (e) => { const b = e.target.closest('.sr'); if (b) { e.preventDefault(); pickSearch(sList[+b.dataset.i]); } });
 document.addEventListener('click', (e) => { if (!e.target.closest('.swrap')) $('sres').hidden = true; });
 
+// ---------------------------------------------------------------- keeping up with the server
+// Buttons on notifications, calendar syncs and other windows change data behind this page's back.
+function showBanner() { $('banner').hidden = macStatus !== 'denied' || sessionStorage.getItem('planner:banner') === '1'; }
+$('bannerOpen').onclick = () => api('POST', '/api/mac-settings');
+$('bannerHide').onclick = () => { try { sessionStorage.setItem('planner:banner', '1'); } catch {} showBanner(); };
+async function syncFromServer() {
+  if (document.hidden || document.querySelector('dialog[open]') || document.body.classList.contains('dragging-ev')) return;
+  try {
+    const st = await api('GET', '/api/state');
+    if (JSON.stringify(st.items) !== JSON.stringify(items) || JSON.stringify(st.trash || []) !== JSON.stringify(trash)) { items = st.items; trash = st.trash || []; render(); }
+    if ((st.mac || 'unknown') !== macStatus) { macStatus = st.mac || 'unknown'; showBanner(); }
+  } catch {}
+}
+setInterval(syncFromServer, 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromServer(); });
+
 // ---------------------------------------------------------------- start
 (async () => {
   const st = await api('GET', '/api/state');
-  P = { ...P, ...st.profile }; trash = st.trash || []; sec = st.security || sec; S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
+  P = { ...P, ...st.profile }; trash = st.trash || []; sec = st.security || sec; macStatus = st.mac || 'unknown'; S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
   setPage(page);
   render();
+  showBanner();
+  const want = new URLSearchParams(location.search).get('open'); // clicking a notification opens the item
+  if (want) { history.replaceState(null, '', location.pathname); const it = items.find((x) => x.id === want); if (it) { setPage('cal'); if (it.date) { cur = day(it.date); autoscroll = true; render(); } openForm(it); } }
   if (PlannerNote.wasOpen()) { PlannerNote.open(notepad); noteBtn(); }
   setInterval(() => { if (!document.querySelector('dialog[open]')) { renderCal(); renderTasks(); } }, 60000);
 })();

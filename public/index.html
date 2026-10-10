@@ -41,6 +41,7 @@
   </div>
 </header>
 
+<div class="banner" id="banner" hidden role="alert"><span><b>Mac notifications are blocked.</b> ChronKeep cannot pop up reminders until you allow it in System Settings.</span><span class="bact"><button type="button" class="btn sm" id="bannerOpen">Open settings</button><button type="button" class="btn ghost sm" id="bannerHide">Dismiss</button></span></div>
 <div class="shell">
   <nav class="rail" aria-label="Main">
     <button class="ritem on" id="railCal" aria-label="Calendar"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
@@ -184,6 +185,7 @@
             <label class="chk"><input type="checkbox" id="sPhone"> Phone and other devices (ntfy)</label>
             <label class="field">ntfy topic: subscribe to this in the ntfy app<input id="sTopic" spellcheck="false"></label>
             <div class="frm"><button type="button" class="btn ghost sm" id="sTest">Send test notification</button><button type="button" class="btn ghost sm" id="sMacSet">Open Mac notification settings</button></div>
+            <p class="note" id="macNote"></p>
             <p class="note">No popup on your Mac? Open that pane, find <b>ChronKeep</b> in the list and turn <b>Allow Notifications</b> on. If macOS was ever told "Don't Allow", it hides every ChronKeep notification silently.</p>
           </div>
         </div>
