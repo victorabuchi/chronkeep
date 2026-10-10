@@ -189,7 +189,7 @@ function notify(title, body, meta = {}) {
   if (s.notifyPhone && s.ntfyTopic) {
     fetch(`${s.ntfyServer.replace(/\/$/, '')}/${encodeURIComponent(s.ntfyTopic)}`, {
       method: 'POST',
-      headers: { Title: title, Priority: 'high', Tags: 'bell', ...(s.notifyIcon ? { Icon: s.notifyIcon } : {}), ...phoneButtons(meta) },
+      headers: { Title: title, Priority: ({ high: 'urgent', low: 'default' })[(db.items.find((x) => x.id === meta.itemId) || {}).priority] || 'high', Tags: 'bell', ...(s.notifyIcon ? { Icon: s.notifyIcon } : {}), ...phoneButtons(meta) },
       body,
     }).catch((e) => console.error('ntfy failed:', e.message));
   }
@@ -239,6 +239,20 @@ function prime(item) {
     for (const rem of item.reminders || []) if (now >= atOn(item, d).getTime() - rem * 60000) db.notified.push(`${item.id}@${ymd(d)}@${rem}`);
   }
 }
+
+// ---- attachments: files kept next to the data file, never inside the web folder ----
+const UPLOADS = path.join(path.dirname(DATA), 'uploads');
+const MAX_FILE = 10 * 1024 * 1024, MAX_FILES = 10;
+const readRaw = (req, limit) => new Promise((resolve) => {
+  const chunks = []; let size = 0, over = false;
+  req.on('data', (c) => { size += c.length; if (size > limit) { over = true; chunks.length = 0; } else if (!over) chunks.push(c); });
+  req.on('end', () => resolve(over ? null : Buffer.concat(chunks)));
+  req.on('error', () => resolve(null));
+});
+const cleanName = (n) => path.basename(String(n || 'file')).replace(/[^\w.\- ()\[\]]+/g, '_').slice(-120) || 'file';
+const purgeFiles = (id) => fs.rmSync(path.join(UPLOADS, id), { recursive: true, force: true });
+// Only plain pictures, PDFs, text, audio and video open in the browser; everything else downloads.
+const INLINE = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|audio\/[\w.+-]+|video\/[\w.+-]+)$/;
 
 // ---- calendar links and files ----
 const publicFeed = (f) => { let host = ''; try { host = new URL(f.url).host; } catch {} return { id: f.id, name: f.name, category: f.category, enabled: f.enabled !== false, lastSync: f.lastSync || 0, lastError: f.lastError || '', count: f.count || 0, host }; };
@@ -383,7 +397,7 @@ function tick() {
   }
 
   const keepTrash = db.trash.filter((t) => Date.now() - t.deletedAt < 30 * 86400000);
-  if (keepTrash.length !== db.trash.length) { db.trash = keepTrash; changed = true; }
+  if (keepTrash.length !== db.trash.length) { db.trash.filter((t) => !keepTrash.includes(t)).forEach((t) => purgeFiles(t.id)); db.trash = keepTrash; changed = true; }
   if (Object.keys(db.nudged).length > 600) { const keep = ymd(new Date(Date.now() - 2 * 86400000)); for (const k of Object.keys(db.nudged)) if (k.split('@')[1] < keep) delete db.nudged[k]; }
   if (db.notified.length > 4000) db.notified = db.notified.slice(-2000);
   if (changed) save();
@@ -548,6 +562,7 @@ const handler = async (req, res) => {
     const want = db.profile.email || 'DELETE';
     if (String((await readBody(req)).confirm || '').trim().toLowerCase() !== want.toLowerCase()) return send(res, 400, { error: 'The confirmation did not match.' });
     store.backupNow(DATA, 'pre-delete');
+    fs.rmSync(UPLOADS, { recursive: true, force: true });
     db = defaults(); save();
     return send(res, 200, { ok: true });
   }
@@ -566,7 +581,7 @@ const handler = async (req, res) => {
     return send(res, 200, { ok: true });
   }
   // The bin: deleted items wait here for 30 days and can be put back.
-  if (p === '/api/trash' && req.method === 'DELETE') { db.trash = []; save(); return send(res, 200, { ok: true }); }
+  if (p === '/api/trash' && req.method === 'DELETE') { db.trash.forEach((t) => purgeFiles(t.id)); db.trash = []; save(); return send(res, 200, { ok: true });  }
   const tm = p.match(/^\/api\/trash\/([\w-]+)(\/restore)?$/);
   if (tm) {
     const i = db.trash.findIndex((x) => x.id === tm[1]);
@@ -576,7 +591,7 @@ const handler = async (req, res) => {
       if (item.source) db.ignored = db.ignored.filter((k) => k !== `${item.source.feed}|${item.source.key}`);
       prime(item); db.items.push(item); save(); return send(res, 200, item);
     }
-    if (!tm[2] && req.method === 'DELETE') { db.trash.splice(i, 1); save(); return send(res, 200, { ok: true }); }
+    if (!tm[2] && req.method === 'DELETE') { purgeFiles(db.trash[i].id); db.trash.splice(i, 1); save(); return send(res, 200, { ok: true }); }
   }
   if (p === '/api/mac-settings' && req.method === 'POST') {
     if (process.platform === 'darwin') execFile('open', ['x-apple.systempreferences:com.apple.Notifications-Settings.extension'], () => {});
@@ -584,8 +599,39 @@ const handler = async (req, res) => {
   }
   if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!', { kind: 'test' }); return send(res, 200, { ok: true }); }
   if (p === '/api/items' && req.method === 'POST') {
-    const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', location: '', done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
+    const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', location: '', priority: '', subtasks: [], attachments: [], done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
     prime(it); db.items.push(it); save(); return send(res, 200, it);
+  }
+  // Attachments
+  const fup = p.match(/^\/api\/items\/([\w-]+)\/files$/);
+  if (fup && req.method === 'POST') {
+    const item = db.items.find((x) => x.id === fup[1]);
+    if (!item) return send(res, 404, { error: 'That item no longer exists.' });
+    if ((item.attachments || []).length >= MAX_FILES) return send(res, 400, { error: `An item can have up to ${MAX_FILES} files.` });
+    const data = await readRaw(req, MAX_FILE);
+    if (!data) return send(res, 413, { error: 'That file is larger than 10 MB.' });
+    if (!data.length) return send(res, 400, { error: 'That file is empty.' });
+    const meta = { id: crypto.randomBytes(4).toString('hex'), name: cleanName(url.searchParams.get('name')), size: data.length, type: String(req.headers['content-type'] || 'application/octet-stream').split(';')[0].toLowerCase(), addedAt: Date.now() };
+    fs.mkdirSync(path.join(UPLOADS, item.id), { recursive: true });
+    fs.writeFileSync(path.join(UPLOADS, item.id, meta.id), data);
+    item.attachments = [...(item.attachments || []), meta]; save();
+    return send(res, 200, meta);
+  }
+  const fget = p.match(/^\/api\/files\/([\w-]+)\/([a-f0-9]{8})$/);
+  if (fget && req.method === 'GET') {
+    const item = db.items.find((x) => x.id === fget[1]), meta = item && (item.attachments || []).find((a) => a.id === fget[2]);
+    const file = meta && path.join(UPLOADS, item.id, meta.id);
+    if (!meta || !fs.existsSync(file)) { res.writeHead(404); return res.end('Not found'); }
+    const inline = INLINE.test(meta.type);
+    res.writeHead(200, { 'Content-Type': inline ? meta.type : 'application/octet-stream', 'Content-Length': meta.size, 'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(meta.name)}`, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox", 'Cache-Control': 'private, max-age=0' });
+    return fs.createReadStream(file).pipe(res);
+  }
+  const fdel = p.match(/^\/api\/items\/([\w-]+)\/files\/([a-f0-9]{8})$/);
+  if (fdel && req.method === 'DELETE') {
+    const item = db.items.find((x) => x.id === fdel[1]);
+    if (!item || !(item.attachments || []).some((a) => a.id === fdel[2])) return send(res, 404, {});
+    item.attachments = item.attachments.filter((a) => a.id !== fdel[2]); fs.rmSync(path.join(UPLOADS, item.id, fdel[2]), { force: true }); save();
+    return send(res, 200, { ok: true });
   }
   // "Only this one": take a single occurrence out of a repeating series. The series skips that day and a
   // separate, non-repeating item takes its place, carrying whatever changes were made.
@@ -596,7 +642,7 @@ const handler = async (req, res) => {
     const ALLOWED = ['type', 'title', 'notes', 'location', 'date', 'time', 'endTime', 'endDate', 'category', 'reminders', 'nudges'];
     const patch = Object.fromEntries(Object.entries(b.patch || {}).filter(([k]) => ALLOWED.includes(k)));
     const copy = { ...JSON.parse(JSON.stringify(orig)), id: crypto.randomUUID(), repeat: 'none', repeatUntil: '', skip: [], doneOn: [], done: (orig.doneOn || []).includes(occ), doneAt: null, lastNag: 0, date: occ, ...patch };
-    delete copy.source;
+    delete copy.source; copy.attachments = [];
     orig.skip = [...new Set([...(orig.skip || []), occ])]; orig.doneOn = (orig.doneOn || []).filter((x) => x !== occ);
     prime(orig); prime(copy); db.items.push(copy); save();
     return send(res, 200, { original: orig, created: copy });
@@ -607,6 +653,7 @@ const handler = async (req, res) => {
     if (i < 0) return send(res, 404, {});
     if (req.method === 'PUT') {
       const patch = await readBody(req);
+      delete patch.attachments; delete patch.source; // files and calendar links change only through their own routes
       db.items[i] = { ...db.items[i], ...patch, id: m[1] };
       if (['date', 'time', 'reminders', 'repeat', 'nudges', 'skip', 'repeatUntil', 'endDate'].some((k) => k in patch)) { db.items[i].lastNag = 0; prime(db.items[i]); }
       save(); return send(res, 200, db.items[i]);

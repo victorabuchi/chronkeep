@@ -431,3 +431,26 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .ev.cont-up{border-top-left-radius:0;border-top-right-radius:0;border-top-style:dashed}
 .ev.cont-down{border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom-style:dashed}
 .ev.cont-down .rz,.ev.cont-up:not(.cont-down) .rz{display:none}
+
+/* priority, steps and files */
+.prio{padding:1px 7px;border-radius:6px;background:color-mix(in srgb,var(--pc) 14%,var(--card));color:var(--pc);font-size:11px;font-weight:800}
+.clip{display:inline-flex;align-items:center;gap:3px;color:var(--muted)}
+.hi{color:var(--neg);font-weight:900}
+.circle.sm{width:16px;height:16px;margin-top:0;border-width:1.5px}
+.circle.sm.on::after{width:6px;height:3.5px;border-width:0 0 2px 2px}
+.subs{display:none;margin-top:6px;gap:3px}
+.tasks.full .subs{display:grid}
+.substep{display:flex;align-items:center;gap:8px;padding:2px 0;color:var(--ink2);font-size:13px}
+.substep.done span{color:var(--muted);text-decoration:line-through}
+#fSubs{display:grid;gap:5px;margin-bottom:6px}
+.sub{display:flex;align-items:center;gap:8px}
+.sub input{flex:1;min-width:0}
+.sub .circle{flex:none}
+.x{flex:none;width:28px;height:28px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);font-size:16px;line-height:1}
+.x:hover{color:var(--neg);border-color:var(--neg-line)}
+.files{display:grid;gap:5px;margin-bottom:8px}
+.file{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+.file a,.file span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);font-weight:600;text-decoration:none}
+.file a:hover{color:var(--b)}
+.file small{color:var(--muted);white-space:nowrap}
+.file.pending span{color:var(--muted)}

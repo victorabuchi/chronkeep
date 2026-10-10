@@ -234,10 +234,13 @@
   <div class="two" id="fEndWrap" hidden><div><label class="l">End time</label><input type="time" id="fEnd"></div><div><label class="l">Ends on (long events)</label><input type="date" id="fEndDate"></div></div>
   <div id="fLocWrap" hidden><label class="l">Location</label><input id="fLoc" maxlength="200" placeholder="Room, building or link"></div>
   <p class="note" id="fSource" hidden></p>
+  <div id="fPrioWrap"><label class="l">Priority</label><div class="segment wide" id="fPrio"><button type="button" data-p="" data-on="true">None</button><button type="button" data-p="low">Low</button><button type="button" data-p="medium">Medium</button><button type="button" data-p="high">High</button></div></div>
+  <div id="fSubWrap"><label class="l">Steps</label><div id="fSubs"></div><input id="fSubNew" maxlength="120" placeholder="Add a step, press Enter" autocomplete="off"></div>
   <label class="l">Remind me once</label><div class="chips" id="fRem"></div>
   <label class="l">Keep reminding me until it is done</label><div id="fNud"></div>
   <div class="two"><div id="fRepeatWrap"><label class="l">Repeat</label><select id="fRepeat"><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><div id="fUntilWrap" hidden><label class="l">Repeat until (optional)</label><input type="date" id="fUntil"></div></div>
   <label class="l">Notes</label><textarea id="fNotes" rows="2"></textarea>
+  <label class="l">Files</label><div id="fFiles" class="files"></div><div class="frm"><label class="btn ghost sm" for="fFileIn" style="cursor:pointer">Add a file</label><input type="file" id="fFileIn" multiple hidden><span class="msg" id="fFileMsg" role="status"></span></div>
   <div class="actions"><button type="button" class="btn danger left" id="fDel">Delete</button><button type="button" class="btn ghost" id="fCancel">Cancel</button><button class="btn">Save</button></div>
 </form></dialog>
 
