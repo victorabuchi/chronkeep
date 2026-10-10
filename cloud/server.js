@@ -315,5 +315,7 @@ async function start() {
   if (!process.env.NO_JOBS) { setTimeout(syncFeedsJob, 20000).unref(); setInterval(syncFeedsJob, 15 * 60000).unref(); }
   return server;
 }
+// A stray error somewhere must be logged, not take the whole server (and everyone signed in) down.
+process.on('unhandledRejection', (e) => console.error('Unhandled rejection:', e));
 if (require.main === module) start().catch((e) => { console.error(e); process.exit(1); });
 module.exports = { start, handler, syncFeedsJob, forgetLive: (id) => live.delete(id) };

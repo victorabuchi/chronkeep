@@ -6,12 +6,19 @@ const { defaults, normalize } = require('../lib/model');
 const { stamp } = require('../lib/sync');
 
 let pool;
-const q = (text, params) => pool.query(text, params);
+const q = async (text, params) => {
+  try { return await pool.query(text, params); } catch (e) {
+    if (['EADDRNOTAVAIL', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT', '57P01'].includes(e.code) || /Connection terminated/.test(e.message)) return pool.query(text, params);
+    throw e;
+  }
+};
 
 async function connect(url = process.env.DATABASE_URL) {
   if (!url) throw new Error('DATABASE_URL is not set. On Supabase use the Session pooler string (port 5432); the direct connection is IPv6 only and does not work from Render.');
   const local = /localhost|127\.0\.0\.1/.test(url);
-  pool = new Pool({ connectionString: url, max: Number(process.env.DB_POOL_MAX) || 4, ssl: local ? false : { rejectUnauthorized: false } });
+  pool = new Pool({ connectionString: url, max: Number(process.env.DB_POOL_MAX) || 4, ssl: local ? false : { rejectUnauthorized: false }, keepAlive: true, idleTimeoutMillis: 20000, connectionTimeoutMillis: 15000 });
+  // An idle connection can be dropped by the network or the pooler. That must never stop the server: the pool just opens a new one.
+  pool.on('error', (e) => console.error('Database connection dropped (a new one is opened when needed):', e.code || e.message));
   await q(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
   return pool;
 }
