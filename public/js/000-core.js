@@ -18,7 +18,11 @@ const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const day = (s) => new Date(s + 'T00:00');
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const api = async (m, u, b) => (await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined })).json();
+const api = async (m, u, b) => {
+  const r = await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
+  if (r.status === 401 && location.pathname === '/app') location.href = '/login'; // the cloud sign-in ran out
+  return r.json();
+};
 const store = (k, v) => { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
 const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 

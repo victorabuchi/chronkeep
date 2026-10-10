@@ -507,3 +507,6 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
   .nrow select{flex:1 1 140px}
   .frm{flex-wrap:wrap}
 }
+
+/* Cloud version: no Mac or network cards, no test notification button. */
+.cloud #secCard,.cloud #autoCard,.cloud #mTest{display:none!important}

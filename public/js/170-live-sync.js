@@ -8,6 +8,9 @@ async function syncFromServer() {
   try {
     const st = await api('GET', '/api/state');
     if (JSON.stringify(st.items) !== JSON.stringify(items) || JSON.stringify(st.trash || []) !== JSON.stringify(trash)) { items = st.items; trash = st.trash || []; render(); }
+    // Changes made on another device (the phone) to settings, profile and the note.
+    const other = JSON.stringify([st.settings, st.profile, st.notepad]) !== JSON.stringify([S, P, notepad]) && st.cloud;
+    if (other) { S = norm(st.settings); P = { ...P, ...st.profile }; notepad = st.notepad || notepad; render(); }
     if ((st.mac || 'unknown') !== macStatus) { macStatus = st.mac || 'unknown'; showBanner(); }
   } catch {}
 }
