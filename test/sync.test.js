@@ -95,6 +95,12 @@ describe('applying a device\'s changes', () => {
     applyChanges(d, { parts: { settings: { value: { accent: '#000000' }, updatedAt: 4000 } } }, 6000);
     assert.equal(d.settings.accent, '#abcdef');
   });
+  it('refuses a second copy of the same calendar event', () => {
+    const d = fresh(), ev = (id) => ({ ...item(id, 'Lecture', 5000), source: { feed: 'f', key: 'k' } });
+    applyChanges(d, { items: [ev('one')] }, 6000);
+    const r = applyChanges(d, { items: [ev('two')] }, 6000);
+    assert.deepEqual(d.items.map((i) => i.id), ['one']); assert.deepEqual(r.stale, ['two']);
+  });
   it('refuses odd ids and clamps a clock far in the future', () => {
     const d = fresh(); applyChanges(d, { items: [item('../x', 'Bad', 5)] }, 10);
     assert.equal(d.items.length, 0);
