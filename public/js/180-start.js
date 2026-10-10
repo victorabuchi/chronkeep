@@ -7,7 +7,10 @@ function goCloud(who) {
   P = { ...P, email: P.email || who.email, name: P.name || who.name };
   $('mOut').hidden = false;
   $('mOut').onclick = async () => { await fetch('/auth/logout', { method: 'POST' }); location.href = '/'; };
-  $('notifCard').innerHTML = '<strong>Notifications</strong><p class="note">Reminders arrive on your phone through the ChronKeep app, set up with the repeating-reminder rules above. Install it on your phone and sign in with this account.</p>';
+  // The notification switches are for this computer; keep them in the page (the form still fills them) but hide them.
+  $('notifCard').hidden = true;
+  $('notifCard').insertAdjacentHTML('afterend', '<div class="scard"><strong>Notifications</strong><p class="note">Reminders arrive on your phone through the ChronKeep app, set up with the repeating-reminder rules above. Install it on your phone and sign in with this account.</p></div>');
+  const cal = document.querySelector('#calCard .note'); if (cal) cal.textContent = cal.textContent.replace('kept on this computer only', 'kept in your account only');
 }
 (async () => {
   const st = await api('GET', '/api/state');
