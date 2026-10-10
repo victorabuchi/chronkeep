@@ -39,7 +39,7 @@ $('qType').addEventListener('change', () => $('qTitle').dispatchEvent(new Event(
 $('btnAdd').onclick = () => openForm(null);
 const step = (n) => {
   if (view === 'month') cur = new Date(cur.getFullYear(), cur.getMonth() + n, 1);
-  else cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + n * (view === 'week' ? 7 : 1));
+  else cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + n * (view === 'week' ? (narrow() ? 3 : 7) : 1));
   navDir = n; autoscroll = true; render();
 };
 $('prev').onclick = () => step(-1); $('next').onclick = () => step(1);

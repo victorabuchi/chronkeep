@@ -9,9 +9,9 @@ function fillProfile() {
 const flash = (el, text, bad) => { el.textContent = text; el.classList.toggle('bad', !!bad); };
 $('photoBtn').onclick = $('photoPick').onclick = () => $('photoFile').click();
 $('photoRemove').onclick = () => { photoNew = ''; showPhoto(''); };
-$('photoFile').onchange = async (e) => {
-  const file = e.target.files[0]; e.target.value = '';
-  if (!file) return;
+// Resizing a picture takes a moment. Saving waits for it, so a quick press of Save never loses the photo.
+let photoWork = Promise.resolve();
+async function readPhoto(file) {
   if (!file.type.startsWith('image/')) return flash($('profileMsg'), 'Choose a picture.', true);
   try {
     const bmp = await createImageBitmap(file), k = Math.min(1, 240 / Math.max(bmp.width, bmp.height));
@@ -19,9 +19,11 @@ $('photoFile').onchange = async (e) => {
     c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
     photoNew = c.toDataURL('image/jpeg', 0.82); showPhoto(photoNew); flash($('profileMsg'), '');
   } catch { flash($('profileMsg'), 'That picture could not be read. Try a JPG or PNG.', true); }
-};
+}
+$('photoFile').onchange = (e) => { const file = e.target.files[0]; e.target.value = ''; if (file) photoWork = readPhoto(file); };
 $('profileForm').onsubmit = async (e) => {
   e.preventDefault();
+  await photoWork;
   const body = { name: $('pName').value, email: $('pEmail').value, phone: $('pPhone').value };
   if (photoNew !== null) body.photo = photoNew;
   const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

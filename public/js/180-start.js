@@ -1,4 +1,5 @@
 // ---------------------------------------------------------------- start
+window.matchMedia('(max-width: 640px)').addEventListener('change', () => { autoscroll = true; render(); });
 (async () => {
   const st = await api('GET', '/api/state');
   P = { ...P, ...st.profile }; trash = st.trash || []; sec = st.security || sec; macStatus = st.mac || 'unknown'; S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;

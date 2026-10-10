@@ -3,7 +3,10 @@ const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'Au
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DOWL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// On a phone the week is three days, which is as many as fit.
+const narrow = () => window.matchMedia('(max-width: 640px)').matches;
 function weekDays() {
+  if (narrow()) return [0, 1, 2].map((i) => new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + i));
   const start = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() - ((cur.getDay() - S.weekStart + 7) % 7));
   return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)).filter((d) => S.showWeekends || (d.getDay() !== 0 && d.getDay() !== 6));
 }
@@ -83,7 +86,8 @@ function renderCal() {
   const days = view === 'week' ? weekDays() : [cur];
   $('ctitle').textContent = title(days);
   const wk = (() => { const t = new Date(Date.UTC(days[0].getFullYear(), days[0].getMonth(), days[0].getDate() + 3)); const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y) / 86400000 + 1 - ((t.getUTCDay() + 6) % 7) + 3) / 7); })();
-  $('eyebrow').textContent = view === 'week' ? `Week ${wk}` : view === 'day' ? 'Day' : 'Month';
+  $('eyebrow').textContent = view === 'week' ? (narrow() ? '3 days' : `Week ${wk}`) : view === 'day' ? 'Day' : 'Month';
+  document.querySelector('#viewSeg [data-v=week]').textContent = narrow() ? '3 days' : 'Week';
   const box = $('calscroll'), keep = box.scrollTop;
   box.innerHTML = view === 'month' ? renderMonth() : renderGrid(days);
   document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === view));
