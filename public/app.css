@@ -514,3 +514,8 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 
 /* Cloud version: no Mac or network cards, no test notification button. */
 .cloud #secCard,.cloud #autoCard,.cloud #mTest{display:none!important}
+
+/* Editing a calendar link in place */
+.brow.editing{display:block}
+.feededit{display:grid;gap:10px;width:100%}
+#feedKind{width:100%}

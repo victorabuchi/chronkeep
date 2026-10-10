@@ -163,6 +163,29 @@ describe('cloud server', { skip }, () => {
     } finally { cal.close(); }
   });
 
+  it('a deadlines calendar becomes tasks, and its name, course and type can be edited afterwards', async () => {
+    const stamp = (d, t) => `${d.replace(/-/g, '')}T${t.replace(':', '')}00`;
+    const body = () => ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:q1', `DTSTART:${stamp('2026-10-20', '08:00')}`, `DTEND:${stamp('2026-10-22', '23:00')}`, 'SUMMARY:Quiz 1', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const cal = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/calendar' }); res.end(body()); });
+    await new Promise((r) => cal.listen(0, '127.0.0.1', r));
+    try {
+      const { token } = await signup(), url = `http://127.0.0.1:${cal.address().port}/m.ics`;
+      const added = await call('POST', '/api/feeds', { token, body: { name: 'Moodle', url, category: 'Study', kind: 'assignment' } });
+      assert.equal(added.status, 200, JSON.stringify(added.data)); assert.equal(added.data.feed.kind, 'assignment');
+      let st = (await call('GET', '/api/state', { token })).data;
+      assert.deepEqual([st.items[0].type, st.items[0].date, st.items[0].time, st.items[0].reminders.length > 0], ['assignment', '2026-10-22', '23:00', true]);
+      // rename and change the course
+      const fid = added.data.feed.id;
+      let put = await call('PUT', '/api/feeds/' + fid, { token, body: { name: 'UEF Moodle', category: 'Work' } });
+      assert.equal(put.status, 200); assert.deepEqual([put.data.name, put.data.category, put.data.kind], ['UEF Moodle', 'Work', 'assignment']);
+      assert.equal((await call('GET', '/api/state', { token })).data.items[0].category, 'Work');
+      // say it holds lessons after all: the item turns back into an event, in place
+      put = await call('PUT', '/api/feeds/' + fid, { token, body: { kind: 'event' } });
+      assert.equal(put.status, 200); assert.equal(put.data.kind, 'event');
+      st = (await call('GET', '/api/state', { token })).data; assert.deepEqual([st.items.length, st.items[0].type, st.items[0].date, st.items[0].endDate], [1, 'event', '2026-10-20', '2026-10-22']);
+    } finally { cal.close(); }
+  });
+
   it('refuses cross-site changes', async () => {
     const res = await fetch(base + '/auth/login', { method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'email=a@b.c&password=x', redirect: 'manual' });
     assert.equal(res.status, 403);

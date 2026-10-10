@@ -82,3 +82,33 @@ test('fetching: errors read well, a good calendar passes', async () => {
   await assert.rejects(sync.fetchCalendar('https://x.test/a.ics', async () => { throw new Error('down'); }), /Could not reach/);
   assert.match(await sync.fetchCalendar('https://x.test/a.ics', resp(cal())), /BEGIN:VCALENDAR/);
 });
+
+// ---- deadlines calendars (Moodle): shown as assignments, due when the window closes ----
+const span = (uid, d1, t1, d2, t2, title) => `BEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART:${d1.replace(/-/g, '')}T${t1.replace(':', '')}00\r\nDTEND:${d2.replace(/-/g, '')}T${t2.replace(':', '')}00\r\nSUMMARY:${title}\r\nEND:VEVENT\r\n`;
+const point = (uid, d, t, title) => `BEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART:${d.replace(/-/g, '')}T${t.replace(':', '')}00\r\nSUMMARY:${title}\r\nEND:VEVENT\r\n`;
+const deadlines = { id: 'moodle', category: 'Study', kind: 'assignment' };
+const dopts = (primed = []) => ({ prime: (i) => primed.push(i.id), today: '2026-10-10', reminders: [1440, 180], nudges: [{ from: 'day', every: 60 }] });
+
+test('a deadlines calendar becomes assignments, due when the window closes', () => {
+  const db = mk();
+  const r = sync.importText(db, deadlines, cal(span('quiz', '2026-10-12', '08:00', '2026-10-14', '23:00', 'Quiz 5 closes'), point('ex', '2026-10-13', '23:59', 'Exercise 5 is due')), dopts());
+  assert.equal(r.created, 2);
+  const quiz = db.items.find((i) => i.title === 'Quiz 5 closes'), ex = db.items.find((i) => i.title === 'Exercise 5 is due');
+  assert.deepEqual([quiz.type, quiz.date, quiz.time, quiz.endTime, quiz.endDate], ['assignment', '2026-10-14', '23:00', '', '']);
+  assert.deepEqual([ex.type, ex.date, ex.time], ['assignment', '2026-10-13', '23:59']);
+  assert.deepEqual([quiz.reminders, quiz.nudges.length, quiz.category], [[1440, 180], 1, 'Study']);
+});
+
+test('switching a calendar from lessons to deadlines changes its items in place, with the right reminders', () => {
+  const db = mk(), text = cal(span('x', '2026-10-12', '08:00', '2026-10-14', '23:00', 'Window'));
+  sync.importText(db, { id: 'm', category: 'Study', kind: 'event' }, text, opts());
+  assert.deepEqual([db.items[0].type, db.items[0].date, db.items[0].endDate, db.items[0].reminders], ['event', '2026-10-12', '2026-10-14', [10]]);
+  const id = db.items[0].id;
+  const r = sync.importText(db, { id: 'm', category: 'Study', kind: 'assignment' }, text, dopts());
+  assert.deepEqual(r, { created: 0, updated: 1, removed: 0 });
+  assert.equal(db.items.length, 1); assert.equal(db.items[0].id, id);
+  assert.deepEqual([db.items[0].type, db.items[0].date, db.items[0].time, db.items[0].reminders], ['assignment', '2026-10-14', '23:00', [1440, 180]]);
+  // and back again
+  sync.importText(db, { id: 'm', category: 'Study', kind: 'event' }, text, opts());
+  assert.deepEqual([db.items[0].type, db.items[0].date, db.items[0].endDate, db.items[0].reminders], ['event', '2026-10-12', '2026-10-14', [10]]);
+});

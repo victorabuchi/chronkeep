@@ -11,11 +11,12 @@ async function reloadState() { const st = await api('GET', '/api/state'); S = no
 async function loadFeeds() {
   feeds = await api('GET', '/api/feeds');
   $('feedCat').innerHTML = S.categories.map((c) => `<option ${c.name === 'Timetable' ? 'selected' : ''}>${esc(c.name)}</option>`).join('') + (S.categories.some((c) => c.name === 'Timetable') ? '' : '<option selected>Timetable</option>');
-  $('feedList').innerHTML = feeds.length ? feeds.map((f) => `<div class="brow" data-fid="${f.id}"><span><b>${esc(f.name)}</b><small style="${f.lastError ? 'color:var(--neg)' : ''}">${f.lastError ? esc(f.lastError) : `${f.count} event${f.count === 1 ? '' : 's'} · synced ${ago2(f.lastSync)} · ${esc(f.category || 'no course')}`}</small></span><span class="binact"><button type="button" class="btn ghost sm" data-sync>Sync</button><button type="button" class="btn ghost sm danger" data-drop>Remove</button></span></div>`).join('') : '<p class="note">No calendar links yet.</p>';
+  const kindName = (f) => (f.kind === 'assignment' ? 'deadlines' : 'timetable');
+  $('feedList').innerHTML = feeds.length ? feeds.map((f) => `<div class="brow" data-fid="${f.id}"><span><b>${esc(f.name)}</b><small style="${f.lastError ? 'color:var(--neg)' : ''}">${f.lastError ? esc(f.lastError) : `${f.count} ${f.kind === 'assignment' ? 'deadline' : 'event'}${f.count === 1 ? '' : 's'} · ${kindName(f)} · synced ${ago2(f.lastSync)} · ${esc(f.category || 'no course')}`}</small></span><span class="binact"><button type="button" class="btn ghost sm" data-edit>Edit</button><button type="button" class="btn ghost sm" data-sync>Sync</button><button type="button" class="btn ghost sm danger" data-drop>Remove</button></span></div>`).join('') : '<p class="note">No calendar links yet.</p>';
 }
 const syncText = (r) => (r.created || r.updated || r.removed ? `${r.created} added, ${r.updated} updated, ${r.removed} removed` : 'Already up to date');
 $('feedAdd').onclick = async () => {
-  const body = { name: $('feedName').value, url: $('feedUrl').value, category: $('feedCat').value };
+  const body = { name: $('feedName').value, url: $('feedUrl').value, category: $('feedCat').value, kind: $('feedKind').value };
   $('feedAdd').disabled = true; flash($('feedMsg'), 'Adding…');
   const r = await fetch('/api/feeds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), d = await r.json();
   $('feedAdd').disabled = false;
@@ -27,6 +28,26 @@ $('feedAdd').onclick = async () => {
 $('feedList').addEventListener('click', async (e) => {
   const row = e.target.closest('[data-fid]'); if (!row) return;
   const f = feeds.find((x) => x.id === row.dataset.fid);
+  // Edit: rename it, give it another course, or say it holds deadlines instead of lessons (or the other way round).
+  if (e.target.closest('[data-edit]')) {
+    const cats = S.categories.map((c) => c.name), opt = (v, l, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+    row.classList.add('editing');
+    row.innerHTML = `<div class="feededit"><label class="field">Name<input data-n maxlength="60" value="${esc(f.name)}"></label>
+      <label class="field">Course<select data-c>${opt('', 'No course', f.category)}${cats.map((c) => opt(c, c, f.category)).join('')}${f.category && !cats.includes(f.category) ? opt(f.category, f.category, f.category) : ''}</select></label>
+      <label class="field">What it contains<select data-k>${opt('event', 'Timetable: lessons and events, shown in the hours', f.kind)}${opt('assignment', 'Deadlines: exercises and assignments, shown as tasks', f.kind)}</select></label>
+      <div class="frm"><button type="button" class="btn sm" data-save>Save</button><button type="button" class="btn ghost sm" data-cancel>Cancel</button><span class="msg" role="status"></span></div></div>`;
+    row.querySelector('[data-n]').focus();
+    return;
+  }
+  if (e.target.closest('[data-cancel]')) return loadFeeds();
+  if (e.target.closest('[data-save]')) {
+    const b = e.target.closest('button'); b.disabled = true; row.querySelector('.msg').textContent = 'Saving…';
+    const body = { name: row.querySelector('[data-n]').value, category: row.querySelector('[data-c]').value, kind: row.querySelector('[data-k]').value };
+    const r = await fetch(`/api/feeds/${f.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), d = await r.json();
+    if (!r.ok && !d.feed) { b.disabled = false; row.querySelector('.msg').textContent = d.error || 'Could not save that.'; return; }
+    toast(r.ok ? (d.result ? `${body.name}: now ${body.kind === 'assignment' ? 'deadlines' : 'a timetable'}, ${syncText(d.result)}` : `${body.name} saved`) : d.error);
+    await reloadState(); return loadFeeds();
+  }
   if (e.target.closest('[data-sync]')) {
     const b = e.target.closest('button'); b.disabled = true; b.textContent = 'Syncing…';
     const r = await fetch(`/api/feeds/${f.id}/sync`, { method: 'POST' }), d = await r.json();
@@ -43,7 +64,7 @@ $('feedList').addEventListener('click', async (e) => {
 $('icsFile').onchange = async (e) => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
-  const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, ics: await file.text(), category: $('feedCat').value }) }), d = await r.json();
+  const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, ics: await file.text(), category: $('feedCat').value, kind: $('feedKind').value }) }), d = await r.json();
   if (!r.ok) return flash($('feedMsg'), d.error || 'Could not import that file.', true);
   toast(`${file.name}: ${syncText(d)}`); await reloadState();
 };

@@ -176,7 +176,8 @@
             <div class="field">Add a calendar link
               <input id="feedName" maxlength="60" placeholder="Name, for example UEF timetable">
               <input id="feedUrl" type="url" placeholder="https://...  (a link ending in .ics, or an iCal link)" spellcheck="false" autocomplete="off">
-              <div class="hexrow"><select id="feedCat"></select><button type="button" class="btn sm" id="feedAdd">Add calendar</button></div>
+              <select id="feedKind" aria-label="What this calendar contains"><option value="event">Timetable: lessons and events, shown in the hours</option><option value="assignment">Deadlines: exercises and assignments (Moodle), shown as tasks</option></select>
+              <div class="hexrow"><select id="feedCat" aria-label="Course"></select><button type="button" class="btn sm" id="feedAdd">Add calendar</button></div>
             </div>
             <div class="frm"><label class="btn ghost sm" for="icsFile" style="cursor:pointer">Import a file</label><input type="file" id="icsFile" accept=".ics,text/calendar" hidden><a class="btn ghost sm" href="/api/calendar.ics" download>Export my calendar</a><span class="msg" id="feedMsg" role="status"></span></div>
           </div>
