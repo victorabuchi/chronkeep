@@ -20,6 +20,14 @@ A personal calendar and to-do list that keeps reminding you until the work is do
 
 No dependencies, no build step. Your data stays on your machine in `data.json`.
 
+## Screenshots
+
+<p align="center"><img src="docs/calendar.png" alt="Week view with the task list" width="860"></p>
+<p align="center"><img src="docs/tasks.png" alt="The Tasks page" width="425"> <img src="docs/calendar-dark.png" alt="Dark mode" width="425"></p>
+<p align="center"><img src="docs/phone.png" alt="On a phone" width="220"></p>
+
+(The screenshots use made-up demo data.)
+
 ## Run
 
 ```
