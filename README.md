@@ -20,6 +20,12 @@ A personal calendar and to-do list that keeps reminding you until the work is do
 
 No dependencies, no build step. Your data stays on your machine in `data.json`.
 
+
+## In the cloud (accounts and sync)
+
+Besides the local app, ChronKeep has a cloud edition: `npm run start:cloud` runs `cloud/server.js`, with accounts (email and password, Google, Apple), each person's data in Postgres (Supabase), a landing page, and a sync API the phone app uses so the web and the phone always show the same things. See [docs/SETUP.md](docs/SETUP.md) for deploying it to Render.
+
+
 ## Screenshots
 
 <p align="center"><img src="docs/calendar.png" alt="Week view with the task list" width="860"></p>
