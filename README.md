@@ -65,6 +65,10 @@ test/              node:test suites (run with `npm test`)
 data.json          your data (git-ignored); backups/ and uploads/ sit next to it
 ```
 
+## API
+
+The web app talks to a small JSON API, documented in [docs/API.md](docs/API.md) (access rules, the item format, every endpoint, and what a mobile client would still need).
+
 ## Development
 
 No dependencies and no build step. `npm test` runs the suites (about 75 tests, 10 seconds): the calendar and
