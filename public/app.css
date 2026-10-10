@@ -578,3 +578,8 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .tcard .cfiles{display:flex;flex-wrap:wrap;gap:6px}
 .tcard .cfile{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;font-weight:600;color:var(--ink);text-decoration:none}
 @media(max-width:640px){.cardgrid{grid-template-columns:1fr}}
+
+.tcard h3 .cnt{display:inline-block;min-width:22px;margin-left:6px;padding:0 7px;border-radius:999px;background:var(--b);color:#fff;font-size:12px;font-weight:800;line-height:20px;text-align:center;vertical-align:2px}
+
+.trow.tcard{max-height:none}
+.tcard .cnotes{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}

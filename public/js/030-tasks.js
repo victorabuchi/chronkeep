@@ -46,23 +46,25 @@ function taskRow(it, d, group) {
 }
 
 // To-dos get their own design: big cards with everything about the task, ticked and edited right on the page.
-function taskCard(it, d) {
+function taskCard(it, d, group) {
+  const many = group && group.length > 1;
   const done = d ? isDone(it, d) : it.done, c = color(it.category), subs = it.subtasks || [], sdone = subs.filter((x) => x.done).length;
   const late = d && !done && dueAt(it, d) < new Date();
-  const due = d ? (() => { const [t, k] = rel(dueAt(it, d)); return `<span class="cdue ${done ? '' : k}"><b>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${it.time ? ', ' + it.time : ''}</b>${done ? '' : ` · ${t}`}</span>`; })() : '<span class="cdue">No date</span>';
+  const due = d ? (() => { const [t, k] = rel(dueAt(it, d)); return `<span class="cdue ${done ? '' : k}"><b>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${(many ? [...new Set(group.map(([x]) => x.time).filter(Boolean))].sort().join(', ') : it.time) ? ', ' + (many ? [...new Set(group.map(([x]) => x.time).filter(Boolean))].sort().join(', ') : it.time) : ''}</b>${done ? '' : ` · ${t}`}</span>`; })() : '<span class="cdue">No date</span>';
   const prio = it.priority && PRIO[it.priority] ? `<span class="prio" style="--pc:${PRIO[it.priority][1]}">${PRIO[it.priority][0]} priority</span>` : '';
   const remind = (it.reminders || []).length ? `<div class="cfact"><i>Reminds</i>${[...it.reminders].sort((a, b) => b - a).map((m) => (m > 0 ? `${(REM.find(([v]) => v === m) || [m, `${m} min`])[1]} before` : 'at the time')).join(', ')}</div>` : '';
-  const nudge = (it.nudges || []).length ? `<div class="cfact"><i>Keeps reminding</i>${[...it.nudges].sort((a, b) => rank(b) - rank(a)).map((r) => `every ${everyLabel(r.every)} ${(FROM.find(([v]) => String(v) === String(r.from)) || [0, ''])[1].toLowerCase()}`).join('; ')}</div>` : '';
+  const nudge = (it.nudges || []).length ? `<div class="cfact"><i>Keeps reminding</i>${[...it.nudges].sort((a, b) => rank(b) - rank(a)).map((r) => (() => { const l = (FROM.find(([v]) => String(v) === String(r.from)) || [0, ''])[1].toLowerCase(); return `every ${everyLabel(r.every)}${/^from/.test(l) ? ' ' + l : l === 'right away' ? ', right away' : ', starting ' + l}`; })()).join('; ')}</div>` : '';
   const files = (it.attachments || []).length ? `<div class="cfiles">${it.attachments.map((a) => `<a class="cfile" href="/api/files/${it.id}/${a.id}" target="_blank" rel="noopener">${CLIP}${esc(a.name)}</a>`).join('')}</div>` : '';
   const steps = subs.length ? `<div class="cprog"><span>${sdone} of ${subs.length} steps</span><i><b style="width:${Math.round((sdone / subs.length) * 100)}%"></b></i></div><div class="subs">${subs.map((x) => `<div class="substep ${x.done ? 'done' : ''}" data-sid="${x.id}"><button type="button" class="circle sm ${x.done ? 'on' : ''}" data-substep aria-label="Tick step"></button><span>${esc(x.text)}</span></div>`).join('')}</div>` : '';
-  return `<article class="trow tcard ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${d ? ymd(d) : ''}" style="--c:${c}"><div class="chead"><button type="button" class="circle big ${done ? 'on' : ''}" data-tick aria-label="${done ? 'Mark as not done' : 'Tick off'}"></button><div class="ctitle"><h3>${esc(it.title)}</h3><div class="cmeta">${due}${it.category ? `<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>` : ''}${prio}${rep(it) ? `<span>↻ ${it.repeat}</span>` : ''}</div></div></div>${it.notes ? `<p class="cnotes">${esc(it.notes)}</p>` : ''}${steps}${remind}${nudge}${files}</article>`;
+  return `<article class="trow tcard ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${d ? ymd(d) : ''}" ${many ? `data-ids="${group.map(([x]) => x.id).join(',')}"` : ''} style="--c:${c}"><div class="chead"><button type="button" class="circle big ${done ? 'on' : ''}" data-tick aria-label="${done ? 'Mark as not done' : 'Tick off'}"></button><div class="ctitle"><h3>${esc(it.title)}${many ? ` <b class="cnt" title="${group.length} on this day: ticking it ticks them all">${group.length}</b>` : ''}</h3><div class="cmeta">${due}${it.category ? `<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>` : ''}${prio}${rep(it) ? `<span>↻ ${it.repeat}</span>` : ''}</div></div></div>${it.notes ? `<p class="cnotes">${esc(it.notes)}</p>` : ''}${steps}${remind}${nudge}${files}</article>`;
 }
 
 function renderTasks() {
   const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const open = [], doneL = [];
   for (const it of items) {
-    if (it.type === 'event' || !vis(it) || (typeF === 'event')) continue;
+    // The To-do page is everything still to do (assignments and to-dos), as big cards; the other filters pick one type.
+    if (it.type === 'event' || (typeF !== 'todo' && !vis(it)) || (typeF === 'event')) continue;
     const d = nextOcc(it);
     if (!rep(it) && it.done) doneL.push([it, d]); else open.push([it, d]);
   }
@@ -80,11 +82,11 @@ function renderTasks() {
   $('tlist').classList.toggle('cards', cards);
   let h = '';
   if (cards) {
-    for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="tgroup"><div class="grp ${name === 'Overdue' ? 'red' : ''}"><span>${name}</span><span>${list.length}</span></div><div class="cardgrid">${list.map(([it, d]) => taskCard(it, d)).join('')}</div></section>`;
+    for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="tgroup"><div class="grp ${name === 'Overdue' ? 'red' : ''}"><span>${name}</span><span>${list.length}</span></div><div class="cardgrid">${mergeTasks(list).map((g) => taskCard(g[0][0], g[0][1], g)).join('')}</div></section>`;
     if (!open.length) h += '<div class="empty">Nothing left to do.</div>';
     if (doneL.length) {
       h += `<button class="showdone" id="showDone">${showDone ? 'Hide' : 'Show'} ${doneL.length} completed</button>`;
-      if (showDone) h += `<section class="tgroup"><div class="grp"><span>Completed</span><span>${doneL.length}</span></div><div class="cardgrid">${doneL.reverse().map(([it, d]) => taskCard(it, d)).join('')}</div></section>`;
+      if (showDone) h += `<section class="tgroup"><div class="grp"><span>Completed</span><span>${doneL.length}</span></div><div class="cardgrid">${mergeTasks(doneL.reverse()).map((g) => taskCard(g[0][0], g[0][1], g)).join('')}</div></section>`;
     }
   } else
   for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="gcard ${name === 'Overdue' ? 'red' : ''}"><div class="grp ${name === 'Overdue' ? 'red' : ''}"><span>${name}</span><span>${list.length}</span></div>` + mergeTasks(list).map((g) => taskRow(g[0][0], g[0][1], g)).join('') + '</section>';
