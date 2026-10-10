@@ -17,6 +17,7 @@ function setPage(p) {
   $('railSettings').classList.toggle('on', p === 'settings');
   if (p === 'settings') { fillProfile(); loadBackups(); }
   $('tasks').classList.toggle('full', p === 'tasks');
+  renderTasks(); // merged rows on the full page, one row per task in the sidebar
   $('railCal').classList.toggle('on', p === 'cal');
   $('navTasks').classList.toggle('on', p === 'tasks');
   if (p === 'cal') { autoscroll = true; renderCal(); }

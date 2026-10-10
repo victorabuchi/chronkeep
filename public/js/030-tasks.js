@@ -15,7 +15,9 @@ function rel(due) {
 }
 
 // Tasks that share a title and a day (Moodle's "Attendance at the exercise sessions", six times) become one row with a count.
+// (Only on the full Tasks page: the sidebar lists every task on its own, as it always has.)
 function mergeTasks(list) {
+  if (page !== 'tasks') return list.map((o) => [o]);
   const out = [], seen = new Map();
   for (const o of list) {
     const [it, d] = o, k = `${it.type}|${it.title.trim().toLowerCase()}|${d ? ymd(d) : ''}|${it.done ? 1 : 0}`;
