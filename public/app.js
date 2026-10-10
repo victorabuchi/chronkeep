@@ -375,6 +375,22 @@ $('secLan').onchange = (e) => setSecurity({ lan: e.target.checked }, e.target.ch
 $('secOut').onclick = () => setSecurity({ signOutOthers: true }, 'Signed out');
 $('secRemove').onclick = () => { if (confirm('Remove the PIN? Other devices will lose access.')) setSecurity({ pin: null }, 'PIN removed'); };
 
+// Start with the Mac (a launch agent). Turning it on from a hand-started server makes that server hand over and restart.
+async function fillAutostart() {
+  const st = await api('GET', '/api/autostart');
+  $('autoCard').hidden = !st.supported; $('autoOn').checked = st.enabled;
+}
+$('autoOn').onchange = async (e) => {
+  const want = e.target.checked;
+  const r = await fetch('/api/autostart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enable: want }) });
+  const d = await r.json();
+  if (!r.ok) { flash($('autoMsg'), d.error || 'Could not change that.', true); e.target.checked = !want; return; }
+  if (!d.restarting) return flash($('autoMsg'), want ? 'On. ChronKeep will start at login.' : 'Off');
+  flash($('autoMsg'), 'Restarting ChronKeep, one moment…');
+  for (let i = 0; i < 40; i++) { await sleep(1000); try { if ((await fetch('/api/state')).ok) return location.reload(); } catch {} }
+  flash($('autoMsg'), 'ChronKeep did not come back. Start it again from the terminal.', true);
+};
+
 function fillCustomize() {
   $('sName').value = S.name; $('sAccent').value = S.accent; $('sHex').value = S.accent; $('sHex').classList.remove('bad'); $('sTheme').value = S.theme;
   $('sWeek').value = S.weekStart; $('sDayStart').value = S.dayStart; $('sDayEnd').value = S.dayEnd; $('sWeekend').value = S.showWeekends ? '1' : '0'; $('sDue').value = S.dueTime;
@@ -387,7 +403,7 @@ function fillCustomize() {
   nudgeEditor($('sNudA'), nudA); nudgeEditor($('sNudE'), nudE); nudgeEditor($('sNudT'), nudT);
   cats = S.categories.map((c) => ({ ...c })); drawCats();
   $('customMsg').textContent = '';
-  fillSecurity();
+  fillSecurity(); fillAutostart();
 }
 $('mSettings').onclick = () => { $('userMenu').hidden = true; setPage('customize'); };
 // Type a hex code and the colour loads at once; nothing is saved until Save.

@@ -49,3 +49,7 @@ data.json        your data (created on first run, git-ignored)
 ## Access
 
 ChronKeep only listens on this computer. To open it from your phone or another computer on your Wi-Fi, go to **Customize > Other devices**, set a PIN (6 to 12 digits) and switch on "Allow other devices". Other devices must enter the PIN; five wrong tries lock that address out for a minute. Settings can only be changed from the computer ChronKeep runs on.
+
+## Start at login
+
+**Customize > Start with your Mac** installs a macOS launch agent (`~/Library/LaunchAgents`) that starts ChronKeep when you log in and restarts it if it stops. From the terminal: `node lib/autostart.js install`, `uninstall` or `status`. Logs are in `~/Library/Logs/ChronKeep/server.log`.

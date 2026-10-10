@@ -9,6 +9,7 @@ const { execFile } = require('child_process');
 const PORT = process.env.PORT || 3000;
 const store = require('./lib/store');
 const auth = require('./lib/auth');
+const autostart = require('./lib/autostart');
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
 const PUBLIC = path.join(__dirname, 'public');
 
@@ -346,6 +347,18 @@ const handler = async (req, res) => {
     save();
     if (sec.lan !== wasLan) res.on('finish', () => setImmediate(relisten));
     return send(res, 200, secInfo());
+  }
+  // Start with the Mac: a launch agent that starts this server at login and restarts it if it stops.
+  if (p === '/api/autostart' && req.method === 'GET') return send(res, 200, autostart.status());
+  if (p === '/api/autostart' && req.method === 'POST') {
+    if (!local) return send(res, 403, { error: 'Change this from the computer ChronKeep runs on.' });
+    const { enable } = await readBody(req), st = autostart.status();
+    if (!st.supported) return send(res, 400, { error: 'Auto-start is only available on macOS.' });
+    try {
+      if (enable) { autostart.install({ handOver: !st.managed }); send(res, 200, { ...autostart.status(), restarting: !st.managed }); if (!st.managed) res.on('finish', () => setTimeout(() => process.exit(0), 300)); }
+      else { autostart.uninstall({ keepRunning: st.managed }); send(res, 200, { ...autostart.status(), enabled: false, restarting: st.managed }); }
+    } catch (e) { return send(res, 500, { error: e.message }); }
+    return;
   }
   if (p === '/api/logout' && req.method === 'POST') {
     if (token) db.security.sessions = db.security.sessions.filter((h) => h !== auth.sha(token)); save();
