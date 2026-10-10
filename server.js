@@ -44,6 +44,7 @@ const defaults = () => ({
   },
   profile: { name: '', email: '', phone: '', photo: '' },
   history: [],
+  trash: [],
   items: [],
   notified: [],
   lastDigest: '',
@@ -277,6 +278,8 @@ function tick() {
     db.lastDigest = ymd(now); changed = true;
   }
 
+  const keepTrash = db.trash.filter((t) => Date.now() - t.deletedAt < 30 * 86400000);
+  if (keepTrash.length !== db.trash.length) { db.trash = keepTrash; changed = true; }
   if (Object.keys(db.nudged).length > 600) { const keep = ymd(new Date(Date.now() - 2 * 86400000)); for (const k of Object.keys(db.nudged)) if (k.split('@')[1] < keep) delete db.nudged[k]; }
   if (db.notified.length > 4000) db.notified = db.notified.slice(-2000);
   if (changed) save();
@@ -292,7 +295,7 @@ const readBody = (req) => new Promise((r) => { let b = ''; req.on('data', (c) =>
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
-  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile });
+  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile, trash: db.trash });
   if (p === '/api/profile' && req.method === 'PUT') {
     const b = await readBody(req), next = { ...db.profile };
     if ('name' in b) next.name = String(b.name).trim().slice(0, 80);
@@ -316,7 +319,7 @@ http.createServer(async (req, res) => {
   }
   if (p === '/api/export' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="chronkeep-export-${ymd(new Date())}.json"` });
-    return res.end(JSON.stringify({ exportedAt: new Date().toISOString(), profile: db.profile, settings: db.settings, items: db.items, notepad: db.notepad }, null, 2));
+    return res.end(JSON.stringify({ exportedAt: new Date().toISOString(), profile: db.profile, settings: db.settings, items: db.items, notepad: db.notepad, bin: db.trash }, null, 2));
   }
   if (p === '/api/account' && req.method === 'DELETE') {
     const want = db.profile.email || 'DELETE';
@@ -327,6 +330,18 @@ http.createServer(async (req, res) => {
   if (p === '/api/settings' && req.method === 'PUT') { db.settings = { ...db.settings, ...(await readBody(req)) }; save(); return send(res, 200, db.settings); }
   if (p === '/api/notepad' && req.method === 'PUT') { db.notepad = { html: String((await readBody(req)).html ?? ''), at: new Date().toISOString() }; save(); return send(res, 200, db.notepad); }
   if (p === '/api/notifications' && req.method === 'GET') return send(res, 200, { history: db.history.slice(0, 50), upcoming: upcoming() });
+  // The bin: deleted items wait here for 30 days and can be put back.
+  if (p === '/api/trash' && req.method === 'DELETE') { db.trash = []; save(); return send(res, 200, { ok: true }); }
+  const tm = p.match(/^\/api\/trash\/([\w-]+)(\/restore)?$/);
+  if (tm) {
+    const i = db.trash.findIndex((x) => x.id === tm[1]);
+    if (i < 0) return send(res, 404, {});
+    if (tm[2] && req.method === 'POST') {
+      const { deletedAt, ...item } = db.trash.splice(i, 1)[0];
+      prime(item); db.items.push(item); save(); return send(res, 200, item);
+    }
+    if (!tm[2] && req.method === 'DELETE') { db.trash.splice(i, 1); save(); return send(res, 200, { ok: true }); }
+  }
   if (p === '/api/mac-settings' && req.method === 'POST') {
     if (process.platform === 'darwin') execFile('open', ['x-apple.systempreferences:com.apple.Notifications-Settings.extension'], () => {});
     return send(res, 200, { ok: true });
@@ -346,7 +361,7 @@ http.createServer(async (req, res) => {
       if (['date', 'time', 'reminders', 'repeat', 'nudges'].some((k) => k in patch)) { db.items[i].lastNag = 0; prime(db.items[i]); }
       save(); return send(res, 200, db.items[i]);
     }
-    if (req.method === 'DELETE') { db.items.splice(i, 1); save(); return send(res, 200, {}); }
+    if (req.method === 'DELETE') { const [gone] = db.items.splice(i, 1); db.trash.unshift({ ...gone, deletedAt: Date.now() }); db.trash.length = Math.min(db.trash.length, 200); save(); return send(res, 200, db.trash[0]); }
   }
   // static
   const f = path.join(PUBLIC, p === '/' ? 'index.html' : p);

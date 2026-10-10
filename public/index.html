@@ -45,6 +45,7 @@
     <button class="ritem on" id="railCal" aria-label="Calendar"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
     <button class="ritem" id="navTasks" aria-label="Tasks"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="7" r="1.6"/><circle cx="5" cy="17" r="1.6"/><path d="M10 7h10M10 17h10"/></svg><span>Tasks</span></button>
     <button class="ritem" id="railHistory" aria-label="History"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>History</span></button>
+    <button class="ritem" id="railBin" aria-label="Bin"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg><span>Bin</span><b class="rbadge" id="binBadge" hidden>0</b></button>
     <i class="rgrow"></i>
     <button class="ritem" id="railSet" aria-label="Customize"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Customize</span></button>
     <button class="ritem" id="railSettings" aria-label="Settings"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>Settings</span></button>
@@ -78,6 +79,11 @@
       </form>
       <div class="tlist" id="tlist"></div>
     </aside>
+    <section class="settings" id="bin">
+      <div class="phead"><small class="eyebrow">Deleted items</small><h1>Bin</h1></div>
+      <div class="hbar"><p class="note" id="binNote">Deleted tasks and events stay here for 30 days, then they are removed for good.</p><button type="button" class="btn ghost sm" id="binEmpty">Empty bin</button></div>
+      <div class="hlist" id="binList"></div>
+    </section>
     <section class="settings" id="history">
       <div class="phead"><small class="eyebrow">Completed and past</small><h1>History</h1></div>
       <div class="hstats" id="hStats"></div>
@@ -195,6 +201,7 @@
 </form></dialog>
 
 
+<div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="note.js"></script>
 <script src="app.js"></script>
 </body>
