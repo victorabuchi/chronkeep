@@ -19,7 +19,11 @@ button{cursor:pointer}
 .top{display:flex;align-items:center;gap:12px;flex:none;height:56px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--glass);backdrop-filter:saturate(1.4) blur(10px);position:relative;z-index:30}
 .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;overflow:hidden;flex:none}
 .mark img{display:block;width:100%;height:100%}
-.brand{font-weight:800;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
+.brand{display:none}
+/* The wordmark in the top bar; the green C tile stays for the favicon and notifications. */
+.wordmark{display:block;height:26px;width:auto}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .wordmark{filter:brightness(1.4)}}
+:root[data-theme=dark] .wordmark{filter:brightness(1.4)}
 .sbox{display:flex;align-items:center;gap:8px;width:300px;height:36px;margin-left:14px;padding:0 8px 0 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--muted)}
 .sbox:focus-within{border-color:var(--b);box-shadow:0 0 0 3px color-mix(in srgb,var(--b) 16%,transparent)}
 .sbox input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--ink)}
@@ -464,7 +468,7 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
   .ritem{flex:1;height:44px}
   .ritem span:not(.rbadge){display:none}
   .top{padding:0 10px;gap:8px}
-  .brand{display:none}
+  .wordmark{height:17px}
   .home{margin:0;padding:2px}
   .swrap{flex:1;min-width:0;margin-left:2px}
   .sbox{display:flex;width:auto}
