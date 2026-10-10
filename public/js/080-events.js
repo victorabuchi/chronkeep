@@ -52,7 +52,7 @@ $('prev').onclick = () => step(-1); $('next').onclick = () => step(1);
 const goToday = () => { navDir = cur < new Date() ? 1 : -1; cur = new Date(); autoscroll = true; render(); };
 $('todayBtn').onclick = goToday;
 $('viewSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; store('planner:view', view); autoscroll = true; render(); } };
-document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); if ((typeF === 'assignment' || typeF === 'todo') && page === 'cal') setPage('tasks'); /* assignments and to-dos get the whole screen */ render(); }));
+document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); if (typeF === 'todo' && page === 'cal') setPage('tasks'); /* to-dos get the whole screen, as big cards */ render(); }));
 $('navTasks').onclick = () => setPage('tasks');
 $('railCal').onclick = () => setPage('cal');
 // The logo and name: back to the home page (the calendar, at today); already there, refresh it.

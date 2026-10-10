@@ -583,3 +583,15 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 
 .trow.tcard{max-height:none}
 .tcard .cnotes{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}
+
+/* Assignments in the hours: shaped like events, in their own colour (orange; red when late) */
+:root{--asg:#e8590c}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--asg:#ff9547}}
+:root[data-theme=dark]{--asg:#ff9547}
+.ev.asg{--c:var(--asg);border-left-width:4px;background:color-mix(in srgb,var(--asg) 16%,var(--card));cursor:pointer;background-image:repeating-linear-gradient(135deg,transparent 0 7px,color-mix(in srgb,var(--asg) 7%,transparent) 7px 14px)}
+.ev.asg .tm{display:flex;align-items:center;gap:6px;color:color-mix(in srgb,var(--asg) 70%,var(--ink));font-weight:800;letter-spacing:.01em}
+.ev.asg .tick{margin:0}
+.ev.asg .cnt{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--asg);color:#fff;font-size:10.5px;line-height:16px;text-align:center}
+.ev.asg.late{--c:var(--neg);background-color:var(--neg-bg)}
+.ev.asg.late .tm{color:var(--neg)}.ev.asg.late .cnt{background:var(--neg)}
+.ev.asg.done{opacity:.5}.ev.asg.done .nm{text-decoration:line-through}

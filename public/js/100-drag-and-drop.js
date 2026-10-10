@@ -59,7 +59,7 @@ function startEventDrag(e, el) {
 }
 $('calscroll').addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || e.pointerType === 'touch') return;
-  const ev = e.target.closest('.ev:not(.ghost)'), col = e.target.closest('[data-col]');
+  const ev = e.target.closest('.ev:not(.ghost):not(.asg)'), col = e.target.closest('[data-col]');
   if (ev && !e.target.closest('[data-tick]')) return startEventDrag(e, ev);
   if (col && e.target === col) startCreate(e, col);
 });

@@ -42,16 +42,30 @@ function lanes(list) {
 
 // A day's items: the timed events that go in the hours, and everything else (deadlines, all-day items, events outside the
 // hours shown), which goes in the DUE strip at the top.
+const mins = (t) => { const [h, m] = String(t || '').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 function splitDay(d) {
   const top0 = S.dayStart * 60, timed = [], dueList = [];
+  const asgs = [];
   for (const it of items.filter((x) => vis(x) && showsOn(x, d))) {
+    // An assignment is a block in the hours, ending at its due time, like an event but in its own colour. A due time outside the
+    // hours shown (23:59 against a day that ends at 22:00) sits at the edge of the day, labelled with the real time.
+    if (it.type === 'assignment') {
+      const m = mins(it.time || S.dueTime || '23:59'), lo = S.dayStart * 60, hi = S.dayEnd * 60, end = Math.max(lo + 60, Math.min(m, hi)), start = Math.max(lo, end - 60);
+      asgs.push({ it, s: start, e: end, m });
+      continue;
+    }
     if (it.type === 'event' && it.time) {
       const sg = Recur.segment(it, d, top0, S.dayEnd * 60), e = sg.first && sg.last ? Math.max(sg.start + 15, sg.end) : sg.end; // a part that ends before the first hour shown goes in the top row
       if (e <= top0 || sg.start >= S.dayEnd * 60) dueList.push(it); else timed.push({ it, sg, s: Math.max(sg.start, top0), e: Math.min(e, S.dayEnd * 60) });
     } else dueList.push(it);
   }
   dueList.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
-  return { timed, dueList };
+  // Same-title assignments due at the same minute become one block with a count.
+  const byKey = new Map();
+  for (const a of asgs) { const k = `${a.it.title.trim().toLowerCase()}|${a.m}`; if (!byKey.has(k)) byKey.set(k, { ...a, group: [] }); byKey.get(k).group.push(a.it); }
+  for (const a of byKey.values()) timed.push({ it: a.it, sg: { occ: ymd(d), first: true, last: true, start: a.s, end: a.e }, s: a.s, e: a.e, asg: true, m: a.m, group: a.group });
+  asgs.sort((a, b) => a.m - b.m);
+  return { timed, dueList, deadlines: [...asgs.map((a) => a.it), ...dueList] };
 }
 
 // Deadlines that share a title on one day ("Attendance at the exercise sessions" six times) become one pill with a count.
@@ -87,7 +101,7 @@ function refreshDuePop() { if (dueDay) drawDuePop(false); }
 function drawDuePop(place) {
   let el = document.getElementById('duePop');
   if (!el) { el = document.createElement('div'); el.id = 'duePop'; el.className = 'duepop'; el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
-  const d = day(dueDay), list = splitDay(d).dueList, now = new Date();
+  const d = day(dueDay), list = splitDay(d).deadlines, now = new Date();
   if (!list.length) return closeDuePop();
   el.innerHTML = `<div class="dphead"><b>Due ${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}</b><span>${list.length}</span><button type="button" class="ibtn" data-dpclose aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>` +
     list.map((it) => {
@@ -127,6 +141,11 @@ function renderGrid(days) {
     due += `<div class="due ${t ? 'today' : ''}" data-drop="${ymd(d)}">${dueStrip(dueList, d)}</div>`;
     let evs = lanes(timed).map((ev) => {
       const c = color(ev.it.category), w = 100 / ev.n;
+      if (ev.asg) {
+        const g = ev.group, it = ev.it, many = g.length > 1, done = g.every((x) => isDone(x, d)), late = !done && g.some((x) => !isDone(x, d) && dueAt(x, d) < now);
+        const attrs = many ? `data-due="${ymd(d)}"` : `data-id="${it.id}" data-d="${ymd(d)}" data-occ="${ymd(d)}"`;
+        return `<div class="ev asg ${done ? 'done' : ''} ${late ? 'late' : ''}" ${attrs} style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px)" title="${esc(it.title)}"><div class="tm">${many ? '' : `<button type="button" class="tick ${done ? 'on' : ''}" data-tick aria-label="Tick off"></button>`}Due ${it.time || S.dueTime || ''}${many ? ` <b class="cnt">${g.length}</b>` : ''}</div><div class="nm">${esc(it.title)}</div>${it.category ? `<div class="sb">${esc(it.category)}</div>` : ''}</div>`;
+      }
       const sg = ev.sg, label = sg.first && sg.last ? `${ev.it.time}${ev.it.endTime ? ' to ' + ev.it.endTime : ''}` : sg.first ? `${ev.it.time} and on` : sg.last ? `until ${ev.it.endTime || 'the evening'}` : 'All day';
       return `<div class="ev ${sg.first ? '' : 'cont-up'} ${sg.last ? '' : 'cont-down'}" data-id="${ev.it.id}" data-d="${ymd(d)}" data-occ="${sg.occ}" data-first="${sg.first ? 1 : 0}" data-last="${sg.last ? 1 : 0}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${label}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.location ? `<div class="sb">${esc(ev.it.location)}</div>` : ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}<i class="rz" aria-hidden="true"></i></div>`;
     }).join('');
@@ -134,7 +153,7 @@ function renderGrid(days) {
     cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
   }
   const gut = Array.from({ length: rows }, (_, i) => `<span style="top:${i * HH + (i ? 0 : 9)}px">${S.dayStart + i}:00</span>`).join('');
-  return `<div class="stick"><div class="cols" style="--n:${n}">${head}</div>${typeF === 'event' && !anyDue ? '' : `<div class="cols" style="--n:${n}">${due}</div>`}</div><div class="cols" style="--n:${n};--rows:${rows}"><div class="gut">${gut}</div>${cols}</div>`;
+  return `<div class="stick"><div class="cols" style="--n:${n}">${head}</div>${(typeF === 'event' || typeF === 'assignment') && !anyDue ? '' : `<div class="cols" style="--n:${n}">${due}</div>`}</div><div class="cols" style="--n:${n};--rows:${rows}"><div class="gut">${gut}</div>${cols}</div>`;
 }
 
 // A month day: up to `max` chips, same-title ones merged into a counted pill, then "+N more".

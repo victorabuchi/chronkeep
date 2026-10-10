@@ -3,7 +3,7 @@ function setPage(p) {
   if (page === 'customize' && p !== 'customize') document.documentElement.style.setProperty('--accent', S.accent); // drop an unsaved colour preview
   page = p; store('planner:page', p);
   // Back on the calendar after the full-screen assignments page: show everything again.
-  if (p === 'cal' && (typeF === 'assignment' || typeF === 'todo')) { typeF = 'all'; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === 'all')); }
+  if (p === 'cal' && typeF === 'todo') { typeF = 'all'; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === 'all')); }
   $('main').classList.toggle('tpage', p === 'tasks');
   $('main').classList.toggle('spage', p === 'settings');
   $('main').classList.toggle('hpage', p === 'history');
