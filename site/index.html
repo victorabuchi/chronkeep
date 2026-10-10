@@ -53,7 +53,41 @@
   <div class="cta"><a class="btn btn-primary" href="/signup">Start free</a><a class="btn btn-ghost" href="/login">Log in</a></div>
 </div></section>
 
-<footer class="foot"><div class="wrap"><span>© <script>document.write(new Date().getFullYear())</script> ChronKeep</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:contact@victorabuchi.com">Contact</a><a href="/login">Log in</a></nav></div></footer>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <img class="wm" src="/wordmark-light.png" alt="ChronKeep" width="168" height="32">
+        <p>Never miss a deadline again.</p>
+        <div class="foot-week" id="footWeek" aria-label="This week: tap a day to tick it off"></div>
+        <p class="foot-note" id="footNote" aria-live="polite">Tick off your week.</p>
+      </div>
+      <nav class="foot-cols" aria-label="Footer">
+        <div><b>Product</b><a href="#showcase">See it work</a><a href="#features">Features</a><a href="#how">How it works</a><a href="#everywhere">On your phone</a></div>
+        <div><b>Account</b><a href="/signup" data-guest>Create an account</a><a href="/login" data-guest>Log in</a><a href="/app" data-member hidden>Open your app</a><a href="#" data-member hidden data-signout>Log out</a></div>
+        <div><b>Company</b><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:contact@victorabuchi.com">Contact</a></div>
+      </nav>
+    </div>
+    <div class="foot-bottom"><span>© <script>document.write(new Date().getFullYear())</script> ChronKeep</span><span>Made in Kuopio, for everyone with a deadline.</span></div>
+  </div>
+  <div class="foot-mark" aria-hidden="true">ChronKeep</div>
+</footer>
+<script>
+// The footer's week: seven days, today first. Tap a day to tick it off; tick them all for a small cheer.
+(() => {
+  const box = document.getElementById('footWeek'), note = document.getElementById('footNote');
+  if (!box) return;
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], now = new Date();
+  box.innerHTML = Array.from({ length: 7 }, (_, i) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i); return `<button type="button" class="fday${i === 0 ? ' today' : ''}" aria-pressed="false" aria-label="${names[d.getDay()]} ${d.getDate()}"><i></i><span>${names[d.getDay()]}</span><b>${d.getDate()}</b></button>`; }).join('');
+  const msgs = ['Tick off your week.', 'One down.', 'Two down.', 'Three down. Keep going.', 'Halfway through.', 'Almost there.', 'Six of seven.', 'All done. Nice work.'];
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('.fday'); if (!b) return;
+    b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true');
+    const n = box.querySelectorAll('[aria-pressed="true"]').length;
+    note.textContent = msgs[n]; box.classList.toggle('all', n === 7);
+  });
+})();
+</script>
 <script>
 // Signed in? Show "Open app" and "Sign out" instead of "Log in" and "Start free".
 fetch('/api/me').then((r) => r.ok && r.json()).then((me) => {
@@ -62,7 +96,6 @@ fetch('/api/me').then((r) => r.ok && r.json()).then((me) => {
   document.querySelectorAll('[data-member]').forEach((e) => (e.hidden = false));
   document.querySelectorAll('.cta a[href="/signup"]').forEach((a) => { a.textContent = 'Open your app'; a.href = '/app'; });
   document.querySelectorAll('.cta a[href="/login"]').forEach((a) => (a.hidden = true));
-  document.querySelectorAll('footer a[href="/login"]').forEach((a) => { a.textContent = 'Log out'; a.href = '#'; a.dataset.signout = ''; });
 }).catch(() => {});
 document.addEventListener('click', async (e) => {
   if (!e.target.closest('[data-signout]')) return;

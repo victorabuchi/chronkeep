@@ -46,6 +46,7 @@
 
   let shown = '';
   function render(force) {
+    if (!data) return;
     const def = scenes[clock.scene], t = reduced ? def.dur - 1 : clock.t, d = data[set];
     const name = frameAt(def, t);
     if (force || name !== shown) {
