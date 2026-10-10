@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------- events
 $('calscroll').addEventListener('click', (e) => {
   if (suppressClick) return;
+  const dueBtn = e.target.closest('[data-due]');
+  if (dueBtn) return openDuePop(dueBtn.dataset.due, dueBtn);
   const tick = e.target.closest('[data-tick]');
   const el = e.target.closest('[data-id]');
   if (tick && el) return toggle(el.dataset.id, el.dataset.d);
@@ -17,7 +19,11 @@ $('tlist').addEventListener('click', (e) => {
   if (e.target.id === 'showDone') { showDone = !showDone; return renderTasks(); }
   const row = e.target.closest('.trow');
   if (!row) return;
-  if (e.target.closest('[data-tick]')) return toggle(row.dataset.id, row.dataset.d);
+  if (e.target.closest('[data-tick]')) {
+    // a merged row ticks every task in it, one after the other
+    if (row.dataset.ids) { (async () => { for (const id of row.dataset.ids.split(',')) await toggle(id, row.dataset.d); })(); return; }
+    return toggle(row.dataset.id, row.dataset.d);
+  }
   const st = e.target.closest('[data-substep]');
   if (st) return tickStep(row.dataset.id, st.closest('.substep').dataset.sid, row.dataset.d);
   openForm(items.find((x) => x.id === row.dataset.id), { occ: row.dataset.d });

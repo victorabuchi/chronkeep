@@ -14,14 +14,24 @@ function rel(due) {
   return ms < 0 ? [`${t} overdue`, 'late'] : [`in ${t}`, h < 24 ? 'soon' : 'ok'];
 }
 
-function taskRow(it, d) {
+// Tasks that share a title and a day (Moodle's "Attendance at the exercise sessions", six times) become one row with a count.
+function mergeTasks(list) {
+  const out = [], seen = new Map();
+  for (const o of list) {
+    const [it, d] = o, k = `${it.type}|${it.title.trim().toLowerCase()}|${d ? ymd(d) : ''}|${it.done ? 1 : 0}`;
+    if (seen.has(k)) seen.get(k).push(o); else { const g = [o]; seen.set(k, g); out.push(g); }
+  }
+  return out;
+}
+function taskRow(it, d, group) {
   const done = d ? isDone(it, d) : it.done, c = color(it.category);
   const meta = [];
   meta.push(`<span class="kind">${KIND[it.type]}</span>`);
   if (it.category) meta.push(`<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>`);
   if (d) {
     const due = dueAt(it, d);
-    meta.push(`<span>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${it.time ? ', ' + it.time : ''}</span>`);
+    const times = group && group.length > 1 ? [...new Set(group.map(([x]) => x.time).filter(Boolean))].sort().join(', ') : it.time;
+    meta.push(`<span>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${times ? ', ' + times : ''}</span>`);
     if (!done) { const [t, k] = rel(due); meta.push(`<span class="pill ${k}">${t}</span>`); }
   }
   if (d && !done && (it.nudges || []).length) { const r = activeRule(it, dueAt(it, d), new Date()); if (r) meta.push(`<span class="pill nudge" title="Repeating reminder in force">🔔 every ${everyLabel(r.every)}</span>`); }
@@ -32,7 +42,7 @@ function taskRow(it, d) {
   if (rep(it)) meta.push('<span>↻ ' + it.repeat + '</span>');
   const stepList = subs.length ? `<div class="subs">${subs.map((x) => `<div class="substep ${x.done ? 'done' : ''}" data-sid="${x.id}"><button type="button" class="circle sm ${x.done ? 'on' : ''}" data-substep aria-label="Tick step"></button><span>${esc(x.text)}</span></div>`).join('')}</div>` : '';
   const late = d && !done && dueAt(it, d) < new Date();
-  return `<div class="trow ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${d ? ymd(d) : ''}"><button type="button" class="circle ${done ? 'on' : ''}" data-tick aria-label="Tick off"></button><div class="tx"><div class="ti">${esc(it.title)}</div><div class="me">${meta.join('')}</div>${stepList}</div></div>`;
+  return `<div class="trow ${done ? 'done' : ''} ${late ? 'late' : ''}" data-id="${it.id}" data-d="${d ? ymd(d) : ''}" ${group && group.length > 1 ? `data-ids="${group.map(([x]) => x.id).join(',')}"` : ''}><button type="button" class="circle ${done ? 'on' : ''}" data-tick aria-label="${group && group.length > 1 ? 'Tick all off' : 'Tick off'}"></button><div class="tx"><div class="ti">${esc(it.title)}${group && group.length > 1 ? ` <b class="cnt" title="${group.length} on this day: ticking it ticks them all">${group.length}</b>` : ''}</div><div class="me">${meta.join('')}</div>${stepList}</div></div>`;
 }
 
 function renderTasks() {
@@ -54,11 +64,11 @@ function renderTasks() {
     else { const diff = Math.round((d - today) / 86400000); (diff === 0 ? B.Today : diff === 1 ? B.Tomorrow : diff <= 7 ? B['This week'] : B.Later).push(o); }
   }
   let h = '';
-  for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="gcard ${name === 'Overdue' ? 'red' : ''}"><div class="grp ${name === 'Overdue' ? 'red' : ''}"><span>${name}</span><span>${list.length}</span></div>` + list.map(([it, d]) => taskRow(it, d)).join('') + '</section>';
+  for (const [name, list] of Object.entries(B)) if (list.length) h += `<section class="gcard ${name === 'Overdue' ? 'red' : ''}"><div class="grp ${name === 'Overdue' ? 'red' : ''}"><span>${name}</span><span>${list.length}</span></div>` + mergeTasks(list).map((g) => taskRow(g[0][0], g[0][1], g)).join('') + '</section>';
   if (!open.length) h += '<div class="empty">Nothing left to do.</div>';
   if (doneL.length) {
     h += `<button class="showdone" id="showDone">${showDone ? 'Hide' : 'Show'} ${doneL.length} completed</button>`;
-    if (showDone) h += `<section class="gcard"><div class="grp"><span>Completed</span><span>${doneL.length}</span></div>` + doneL.reverse().map(([it, d]) => taskRow(it, d)).join('') + '</section>';
+    if (showDone) h += `<section class="gcard"><div class="grp"><span>Completed</span><span>${doneL.length}</span></div>` + mergeTasks(doneL.reverse()).map((g) => taskRow(g[0][0], g[0][1], g)).join('') + '</section>';
   }
   $('tlist').innerHTML = h;
   $('tsub').textContent = `${open.length} open${B.Overdue.length ? ` · ${B.Overdue.length} overdue` : ''}`;
@@ -68,4 +78,4 @@ function renderTasks() {
   document.title = `${urgent ? `(${urgent}) ` : ''}${S.name}`;
 }
 
-function render() { applyTheme(); renderCal(); renderTasks(); renderHistory(); renderBin(); }
+function render() { applyTheme(); renderCal(); renderTasks(); renderHistory(); renderBin(); refreshDuePop(); }
