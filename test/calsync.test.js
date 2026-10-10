@@ -99,6 +99,16 @@ test('a deadlines calendar becomes assignments, due when the window closes', () 
   assert.deepEqual([quiz.reminders, quiz.nudges.length, quiz.category], [[1440, 180], 1, 'Study']);
 });
 
+test('deadlines that had already passed when first seen start ticked off; timetable events do not', () => {
+  const db = mk();
+  sync.importText(db, deadlines, cal(point('old', '2026-10-02', '23:59', 'Exercise 1 is due'), point('new', '2026-10-13', '23:59', 'Exercise 5 is due')), dopts());
+  const old = db.items.find((i) => i.title === 'Exercise 1 is due'), next = db.items.find((i) => i.title === 'Exercise 5 is due');
+  assert.deepEqual([old.done, typeof old.doneAt, next.done], [true, 'number', false]);
+  const db2 = mk();
+  sync.importText(db2, { id: 'tt', category: '' }, cal(point('l', '2026-10-02', '10:00', 'Lecture')), dopts());
+  assert.equal(db2.items[0].done, false);
+});
+
 test('switching a calendar from lessons to deadlines changes its items in place, with the right reminders', () => {
   const db = mk(), text = cal(span('x', '2026-10-12', '08:00', '2026-10-14', '23:00', 'Window'));
   sync.importText(db, { id: 'm', category: 'Study', kind: 'event' }, text, opts());
