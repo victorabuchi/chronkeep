@@ -29,6 +29,15 @@ describe('stamping', () => {
   });
 });
 
+describe('fingerprints', () => {
+  it('do not depend on the order of keys, as Postgres jsonb reorders them', () => {
+    const d = fresh(); d.items.push(item('a', 'One')); stamp(d, 2000);
+    const rv = d.items[0].rv, reordered = Object.fromEntries(Object.entries(d.items[0]).reverse());
+    d.items[0] = reordered; stamp(d, 3000);
+    assert.equal(d.items[0].rv, rv);
+  });
+});
+
 describe('changes since', () => {
   it('returns only what is newer than the cursor', () => {
     const d = fresh(); d.items.push(item('a', 'One')); stamp(d, 2000);

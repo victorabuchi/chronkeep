@@ -1,0 +1,49 @@
+# Render Blueprint: New > Blueprint in the Render dashboard, pick this repo.
+services:
+  - type: web
+    name: chronkeep
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm run start:cloud
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Supabase > Connect > Session pooler (port 5432). The direct connection is IPv6 only and does not work from Render.
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      # The public address, used in sign-in redirects and emails, for example https://chronkeep.onrender.com
+      - key: APP_URL
+        sync: false
+      # Password-reset emails (resend.com). Without these, the link is printed in the log.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: ChronKeep <hello@example.com>
+      # Sign in with Google: redirect URI <APP_URL>/auth/google/callback
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Sign in with Apple: Services ID, Team ID, Key ID and the .p8 key text. Return URL <APP_URL>/auth/apple/callback
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
+      # The phone app's bundle id (the audience of its Apple identity token)
+      - key: APPLE_APP_ID
+        value: com.victorabuchi.chronkeep
+      - key: DB_POOL_MAX
+        value: "4"
