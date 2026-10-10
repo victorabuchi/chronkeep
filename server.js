@@ -18,76 +18,7 @@ const Recur = require('./public/recur.js'); // the page uses the same file, so b
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
 const PUBLIC = path.join(__dirname, 'public');
 
-const defaults = () => ({
-  settings: {
-    name: 'ChronKeep',
-    userName: '',
-    accent: '#3b5bdb',
-    theme: 'auto',
-    weekStart: 1,
-    showWeekends: true,
-    dayStart: 7,
-    dayEnd: 22,
-    allDayHour: 9,
-    dueTime: '23:59', // assignments with no time are due at the end of the day
-    // Minutes before the due time / start. 0 = at the time.
-    reminderDefaults: { assignment: [4320, 1440, 180, 30], event: [10], todo: [0] },
-    // Repeating reminders. Each rule: from = minutes before the deadline ('day' = from midnight
-    // of the due day), every = minutes between reminders. The latest rule that applies wins.
-    nudgeDefaults: { assignment: [{ from: 'day', every: 60 }, { from: 60, every: 10 }], event: [], todo: [] },
-    nagHours: 6, // keep reminding about overdue, unticked items every N hours (0 = off)
-    digestHour: 8, // a morning summary of today + overdue (-1 = off)
-    categories: [
-      { name: 'Study', color: '#7c5cf0' },
-      { name: 'Work', color: '#0e8fb0' },
-      { name: 'Personal', color: '#d6457a' },
-      { name: 'Health', color: '#16a36a' },
-    ],
-    ntfyTopic: 'planner-' + crypto.randomBytes(6).toString('hex'),
-    ntfyServer: 'https://ntfy.sh',
-    // Shown on phone notifications (ntfy fetches it, so it must be a public URL).
-    notifyIcon: 'https://raw.githubusercontent.com/victorabuchi/chronkeep/main/public/icon-512.png',
-    notifyMac: true,
-    notifyPhone: true,
-  },
-  profile: { name: '', email: '', phone: '', photo: '' },
-  history: [],
-  trash: [],
-  // Who may reach the server. Kept out of `settings` so the page never receives the PIN hash.
-  security: { lan: false, pin: null, sessions: [] },
-  items: [],
-  notified: [],
-  lastDigest: '',
-  nudged: {},
-  snoozed: {},
-  feeds: [], // calendar links to follow. The links hold private tokens, so the page only ever gets masked copies.
-  ignored: [], // imported events you deleted, so a sync does not bring them back
-  notepad: { html: '', at: null },
-});
-
-// Turns whatever was saved (possibly by an older version) into the current shape.
-function normalize(saved) {
-  const d = defaults();
-  const out = { ...d, ...saved, settings: { ...d.settings, ...(saved && saved.settings) } };
-  out.security = { ...d.security, ...out.security };
-  if (!out.security.actionSecret) out.security.actionSecret = crypto.randomBytes(24).toString('hex');
-  out.snoozed = out.snoozed || {};
-  out.feeds = out.feeds || []; out.ignored = out.ignored || [];
-  // The name used to live in settings; the profile now holds it.
-  out.profile = { ...d.profile, ...out.profile };
-  if (!out.profile.name && out.settings.userName) out.profile.name = out.settings.userName;
-  delete out.settings.userName;
-  // Settings saved by earlier versions: move to the current palette.
-  delete out.settings.headerColor;
-  if (out.settings.name === 'My Planner') out.settings.name = 'ChronKeep';
-  if (['#7b2d6b', '#6366f1', '#0f7a63'].includes(out.settings.accent)) out.settings.accent = '#3b5bdb';
-  const NEW = { Study: '#7c5cf0', Work: '#0e8fb0', Personal: '#d6457a', Health: '#16a36a' };
-  const OLD = ['#b57cf0', '#6b8fd1', '#e0709a', '#3fb59c', '#6366f1', '#f59e0b', '#10b981'];
-  for (const c of out.settings.categories) if (NEW[c.name] && OLD.includes(c.color)) c.color = NEW[c.name];
-  // Older items had a single `remind`.
-  for (const it of out.items) if (!Array.isArray(it.reminders)) it.reminders = it.remind != null && it.remind !== '' ? [Number(it.remind)] : [];
-  return out;
-}
+const { defaults, normalize } = require('./lib/model');
 
 const loaded = store.load(DATA);
 if (loaded.keptAs) console.error(`data.json was damaged. It was kept as ${path.basename(loaded.keptAs)}${loaded.recoveredFrom ? ` and ${loaded.recoveredFrom} was loaded instead` : ' and no backup could be used, so ChronKeep started empty'}.`);
@@ -95,6 +26,30 @@ let db = normalize(loaded.data || {});
 store.dailyBackup(DATA);
 const save = () => store.save(DATA, db);
 save();
+
+// ---- attachments: files kept next to the data file, never inside the web folder ----
+const UPLOADS = path.join(path.dirname(DATA), 'uploads');
+const purgeFiles = (id) => fs.rmSync(path.join(UPLOADS, id), { recursive: true, force: true });
+const { createApi } = require('./lib/api');
+const api = createApi({
+  getDb: () => db,
+  setDb: (next) => { db = next; },
+  save: () => save(),
+  prime: (item) => prime(item),
+  state: () => ({ security: secInfo(), mac: macStatus }),
+  files: {
+    async put(id, att, data) { fs.mkdirSync(path.join(UPLOADS, id), { recursive: true }); fs.writeFileSync(path.join(UPLOADS, id, att), data); },
+    async get(id, att) { const f = path.join(UPLOADS, id, att); return fs.existsSync(f) ? fs.readFileSync(f) : null; },
+    async remove(id, att) { fs.rmSync(path.join(UPLOADS, id, att), { force: true }); },
+    async removeAll(ids) { ids.forEach(purgeFiles); },
+  },
+  backups: {
+    async list() { return store.list(DATA); },
+    async now(label) { return store.backupNow(DATA, label); },
+    async read(name) { return store.readBackup(DATA, name); },
+  },
+});
+const { syncFeed } = api;
 
 // ---- notifications ----
 // Mac popups come from a tiny ChronKeep.app (see mac/) so they show our icon and name.
@@ -259,40 +214,6 @@ function prime(item) {
   }
 }
 
-// ---- attachments: files kept next to the data file, never inside the web folder ----
-const UPLOADS = path.join(path.dirname(DATA), 'uploads');
-const MAX_FILE = 10 * 1024 * 1024, MAX_FILES = 10;
-const readRaw = (req, limit) => new Promise((resolve) => {
-  const chunks = []; let size = 0, over = false;
-  req.on('data', (c) => { size += c.length; if (size > limit) { over = true; chunks.length = 0; } else if (!over) chunks.push(c); });
-  req.on('end', () => resolve(over ? null : Buffer.concat(chunks)));
-  req.on('error', () => resolve(null));
-});
-const cleanName = (n) => path.basename(String(n || 'file')).replace(/[^\w.\- ()\[\]]+/g, '_').slice(-120) || 'file';
-const purgeFiles = (id) => fs.rmSync(path.join(UPLOADS, id), { recursive: true, force: true });
-// Only plain pictures, PDFs, text, audio and video open in the browser; everything else downloads.
-const INLINE = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|audio\/[\w.+-]+|video\/[\w.+-]+)$/;
-
-// ---- calendar links and files ----
-const publicFeed = (f) => { let host = ''; try { host = new URL(f.url).host; } catch {} return { id: f.id, name: f.name, category: f.category, enabled: f.enabled !== false, lastSync: f.lastSync || 0, lastError: f.lastError || '', count: f.count || 0, host }; };
-const syncing = new Set();
-const ensureCategory = (name) => { if (name && !db.settings.categories.some((c) => c.name === name)) db.settings.categories.push({ name, color: '#0e8fb0' }); };
-// Downloads one calendar link and brings its events into the planner.
-async function syncFeed(feed) {
-  if (syncing.has(feed.id)) return { created: 0, updated: 0, removed: 0 };
-  syncing.add(feed.id);
-  try {
-    const text = await calsync.fetchCalendar(feed.url);
-    const res = calsync.importText(db, { id: feed.id, category: feed.category }, text, { prime, today: ymd(new Date()), reminders: db.settings.reminderDefaults.event || [] });
-    feed.lastSync = Date.now(); feed.lastError = ''; feed.count = db.items.filter((i) => i.source && i.source.feed === feed.id).length;
-    save();
-    return res;
-  } catch (e) {
-    feed.lastSync = Date.now(); feed.lastError = e.message; save();
-    throw e;
-  } finally { syncing.delete(feed.id); }
-}
-
 // What is still to come: one-off reminders, the next repeating reminder per item,
 // overdue nags and the morning summary. Mirrors the rules tick() follows.
 function upcoming() {
@@ -425,14 +346,8 @@ setInterval(tick, Number(process.env.CHRONKEEP_TICK_MS) || 20000); // tests run 
 tick();
 
 // ---- http ----
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
-const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
-const readBody = (req) => new Promise((r) => {
-  let b = '', size = 0;
-  req.on('data', (c) => { size += c.length; if (size > 12 * 1024 * 1024) { req.destroy(); return r({}); } b += c; });
-  req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } });
-});
-
+const __t = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
+const { send, readBody, types } = require('./lib/http');
 const tries = auth.limiter();
 const secInfo = () => ({ lan: db.security.lan, hasPin: !!db.security.pin, urls: db.security.lan ? auth.lanUrls(PORT) : [] });
 const handler = async (req, res) => {
@@ -496,51 +411,7 @@ const handler = async (req, res) => {
     } catch (e) { return send(res, 500, { error: e.message }); }
     return;
   }
-  // Calendars: follow links (a timetable, Google Calendar...), import a file, export your own items.
-  if (p === '/api/feeds' && req.method === 'GET') return send(res, 200, db.feeds.map(publicFeed));
-  if (p === '/api/feeds' && req.method === 'POST') {
-    const b = await readBody(req), name = String(b.name || '').trim().slice(0, 60), url = String(b.url || '').trim(), category = String(b.category || '').trim().slice(0, 40);
-    if (!name) return send(res, 400, { error: 'Give the calendar a name.' });
-    const feed = { id: crypto.randomUUID(), name, url, category, enabled: true, lastSync: 0, lastError: '', count: 0 };
-    try { new URL(url); } catch { return send(res, 400, { error: 'That is not a web address.' }); }
-    db.feeds.push(feed);
-    try { const r = await syncFeed(feed); ensureCategory(category); save(); return send(res, 200, { feed: publicFeed(feed), result: r }); }
-    catch (e) { db.feeds = db.feeds.filter((f) => f !== feed); save(); return send(res, 400, { error: e.message }); }
-  }
-  const fm = p.match(/^\/api\/feeds\/([\w-]+)(\/sync)?$/);
-  if (fm) {
-    const feed = db.feeds.find((f) => f.id === fm[1]);
-    if (!feed) return send(res, 404, {});
-    if (fm[2] && req.method === 'POST') {
-      try { return send(res, 200, { feed: publicFeed(feed), result: await syncFeed(feed) }); } catch (e) { return send(res, 502, { error: e.message, feed: publicFeed(feed) }); }
-    }
-    if (!fm[2] && req.method === 'PUT') {
-      const b = await readBody(req);
-      if ('name' in b) feed.name = String(b.name).trim().slice(0, 60) || feed.name;
-      if ('enabled' in b) feed.enabled = !!b.enabled;
-      if ('category' in b) { feed.category = String(b.category).trim().slice(0, 40); ensureCategory(feed.category); for (const it of db.items) if (it.source && it.source.feed === feed.id) it.category = feed.category; }
-      save(); return send(res, 200, publicFeed(feed));
-    }
-    if (!fm[2] && req.method === 'DELETE') {
-      let removed = 0;
-      if (url.searchParams.get('events') === 'remove') { const n = db.items.length; db.items = db.items.filter((i) => !(i.source && i.source.feed === feed.id)); removed = n - db.items.length; }
-      else for (const it of db.items) if (it.source && it.source.feed === feed.id) delete it.source;
-      db.ignored = db.ignored.filter((k) => !k.startsWith(feed.id + '|'));
-      db.feeds = db.feeds.filter((f) => f !== feed); save();
-      return send(res, 200, { ok: true, removed });
-    }
-  }
-  if (p === '/api/import' && req.method === 'POST') {
-    const b = await readBody(req), name = String(b.name || 'calendar').slice(0, 80), category = String(b.category || '').trim().slice(0, 40);
-    try {
-      const r = calsync.importText(db, { id: 'file:' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), category }, String(b.ics || ''), { prime, today: ymd(new Date()), reminders: db.settings.reminderDefaults.event || [] });
-      ensureCategory(category); save(); return send(res, 200, r);
-    } catch (e) { return send(res, 400, { error: e.message }); }
-  }
-  if (p === '/api/calendar.ics' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'attachment; filename="chronkeep.ics"' });
-    return res.end(ics.build(db.items.filter((i) => !i.source), { name: db.settings.name }));
-  }
+  if (await api.handle(req, res, url)) return;
   if (p === '/api/act' && req.method === 'POST') {
     const b = await readBody(req), r = applyAction(b.itemId, b.date, b.action, b.minutes);
     return send(res, r.error ? 404 : 200, r);
@@ -551,134 +422,12 @@ const handler = async (req, res) => {
     res.setHeader('Set-Cookie', 'ck=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
     return send(res, 200, { ok: true });
   }
-  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile, trash: db.trash, security: secInfo(), mac: macStatus });
-  if (p === '/api/profile' && req.method === 'PUT') {
-    const b = await readBody(req), next = { ...db.profile };
-    if ('name' in b) next.name = String(b.name).trim().slice(0, 80);
-    if ('email' in b) {
-      const e = String(b.email).trim().slice(0, 120);
-      if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return send(res, 400, { error: 'That email does not look right.' });
-      next.email = e;
-    }
-    if ('phone' in b) {
-      const ph = String(b.phone).trim().slice(0, 30);
-      if (ph && !/^[0-9+()\-.\s]{5,30}$/.test(ph)) return send(res, 400, { error: 'Use digits, spaces, + ( ) - only for the phone number.' });
-      next.phone = ph;
-    }
-    if ('photo' in b) {
-      const ph = String(b.photo || '');
-      if (ph && !/^data:image\/(jpeg|png|webp);base64,/.test(ph)) return send(res, 400, { error: 'That picture could not be used.' });
-      if (ph.length > 600000) return send(res, 400, { error: 'That picture is too large.' });
-      next.photo = ph;
-    }
-    db.profile = next; save(); return send(res, 200, db.profile);
-  }
-  if (p === '/api/export' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="chronkeep-export-${ymd(new Date())}.json"` });
-    return res.end(JSON.stringify({ exportedAt: new Date().toISOString(), profile: db.profile, settings: db.settings, items: db.items, notepad: db.notepad, bin: db.trash, calendars: db.feeds.map(publicFeed) }, null, 2));
-  }
-  if (p === '/api/account' && req.method === 'DELETE') {
-    const want = db.profile.email || 'DELETE';
-    if (String((await readBody(req)).confirm || '').trim().toLowerCase() !== want.toLowerCase()) return send(res, 400, { error: 'The confirmation did not match.' });
-    store.backupNow(DATA, 'pre-delete');
-    fs.rmSync(UPLOADS, { recursive: true, force: true });
-    db = defaults(); save();
-    return send(res, 200, { ok: true });
-  }
-  if (p === '/api/settings' && req.method === 'PUT') { db.settings = { ...db.settings, ...(await readBody(req)) }; save(); return send(res, 200, db.settings); }
-  if (p === '/api/notepad' && req.method === 'PUT') { db.notepad = { html: String((await readBody(req)).html ?? ''), at: new Date().toISOString() }; save(); return send(res, 200, db.notepad); }
   if (p === '/api/notifications' && req.method === 'GET') return send(res, 200, { history: db.history.slice(0, 50), upcoming: upcoming() });
-  // Backups: daily copies of the data file, kept for two weeks. Restoring keeps a copy of what was there.
-  if (p === '/api/backups' && req.method === 'GET') return send(res, 200, store.list(DATA));
-  if (p === '/api/backups' && req.method === 'POST') { const n = store.backupNow(DATA, `manual-${store.dayStamp()}-${new Date().toTimeString().slice(0, 5).replace(':', '')}`); return send(res, 200, { name: n }); }
-  const bm = p.match(/^\/api\/backups\/([\w.-]+)\/restore$/);
-  if (bm && req.method === 'POST') {
-    const data = store.readBackup(DATA, bm[1]);
-    if (!data || !Array.isArray(data.items)) return send(res, 400, { error: 'That backup could not be read.' });
-    store.backupNow(DATA, `pre-restore-${Date.now()}`);
-    db = normalize(data); save();
-    return send(res, 200, { ok: true });
-  }
-  // The bin: deleted items wait here for 30 days and can be put back.
-  if (p === '/api/trash' && req.method === 'DELETE') { db.trash.forEach((t) => purgeFiles(t.id)); db.trash = []; save(); return send(res, 200, { ok: true });  }
-  const tm = p.match(/^\/api\/trash\/([\w-]+)(\/restore)?$/);
-  if (tm) {
-    const i = db.trash.findIndex((x) => x.id === tm[1]);
-    if (i < 0) return send(res, 404, {});
-    if (tm[2] && req.method === 'POST') {
-      const { deletedAt, ...item } = db.trash.splice(i, 1)[0];
-      if (item.source) db.ignored = db.ignored.filter((k) => k !== `${item.source.feed}|${item.source.key}`);
-      prime(item); db.items.push(item); save(); return send(res, 200, item);
-    }
-    if (!tm[2] && req.method === 'DELETE') { purgeFiles(db.trash[i].id); db.trash.splice(i, 1); save(); return send(res, 200, { ok: true }); }
-  }
   if (p === '/api/mac-settings' && req.method === 'POST') {
     if (process.platform === 'darwin') execFile('open', ['x-apple.systempreferences:com.apple.Notifications-Settings.extension'], () => {});
     return send(res, 200, { ok: true });
   }
   if (p === '/api/test' && req.method === 'POST') { notify('ChronKeep test', 'Notifications are working!', { kind: 'test' }); return send(res, 200, { ok: true }); }
-  if (p === '/api/items' && req.method === 'POST') {
-    const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', location: '', priority: '', subtasks: [], attachments: [], done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
-    prime(it); db.items.push(it); save(); return send(res, 200, it);
-  }
-  // Attachments
-  const fup = p.match(/^\/api\/items\/([\w-]+)\/files$/);
-  if (fup && req.method === 'POST') {
-    const item = db.items.find((x) => x.id === fup[1]);
-    if (!item) return send(res, 404, { error: 'That item no longer exists.' });
-    if ((item.attachments || []).length >= MAX_FILES) return send(res, 400, { error: `An item can have up to ${MAX_FILES} files.` });
-    const data = await readRaw(req, MAX_FILE);
-    if (!data) return send(res, 413, { error: 'That file is larger than 10 MB.' });
-    if (!data.length) return send(res, 400, { error: 'That file is empty.' });
-    const meta = { id: crypto.randomBytes(4).toString('hex'), name: cleanName(url.searchParams.get('name')), size: data.length, type: String(req.headers['content-type'] || 'application/octet-stream').split(';')[0].toLowerCase(), addedAt: Date.now() };
-    fs.mkdirSync(path.join(UPLOADS, item.id), { recursive: true });
-    fs.writeFileSync(path.join(UPLOADS, item.id, meta.id), data);
-    item.attachments = [...(item.attachments || []), meta]; save();
-    return send(res, 200, meta);
-  }
-  const fget = p.match(/^\/api\/files\/([\w-]+)\/([a-f0-9]{8})$/);
-  if (fget && req.method === 'GET') {
-    const item = db.items.find((x) => x.id === fget[1]), meta = item && (item.attachments || []).find((a) => a.id === fget[2]);
-    const file = meta && path.join(UPLOADS, item.id, meta.id);
-    if (!meta || !fs.existsSync(file)) { res.writeHead(404); return res.end('Not found'); }
-    const inline = INLINE.test(meta.type);
-    res.writeHead(200, { 'Content-Type': inline ? meta.type : 'application/octet-stream', 'Content-Length': meta.size, 'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(meta.name)}`, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox", 'Cache-Control': 'private, max-age=0' });
-    return fs.createReadStream(file).pipe(res);
-  }
-  const fdel = p.match(/^\/api\/items\/([\w-]+)\/files\/([a-f0-9]{8})$/);
-  if (fdel && req.method === 'DELETE') {
-    const item = db.items.find((x) => x.id === fdel[1]);
-    if (!item || !(item.attachments || []).some((a) => a.id === fdel[2])) return send(res, 404, {});
-    item.attachments = item.attachments.filter((a) => a.id !== fdel[2]); fs.rmSync(path.join(UPLOADS, item.id, fdel[2]), { force: true }); save();
-    return send(res, 200, { ok: true });
-  }
-  // "Only this one": take a single occurrence out of a repeating series. The series skips that day and a
-  // separate, non-repeating item takes its place, carrying whatever changes were made.
-  const om = p.match(/^\/api\/items\/([\w-]+)\/occurrence$/);
-  if (om && req.method === 'POST') {
-    const orig = db.items.find((x) => x.id === om[1]), b = await readBody(req), occ = String(b.occ || '');
-    if (!orig || !Recur.isRepeat(orig) || !/^\d{4}-\d{2}-\d{2}$/.test(occ)) return send(res, 400, { error: 'That is not a repeating item.' });
-    const ALLOWED = ['type', 'title', 'notes', 'location', 'date', 'time', 'endTime', 'endDate', 'category', 'reminders', 'nudges'];
-    const patch = Object.fromEntries(Object.entries(b.patch || {}).filter(([k]) => ALLOWED.includes(k)));
-    const copy = { ...JSON.parse(JSON.stringify(orig)), id: crypto.randomUUID(), repeat: 'none', repeatUntil: '', skip: [], doneOn: [], done: (orig.doneOn || []).includes(occ), doneAt: null, lastNag: 0, date: occ, ...patch };
-    delete copy.source; copy.attachments = [];
-    orig.skip = [...new Set([...(orig.skip || []), occ])]; orig.doneOn = (orig.doneOn || []).filter((x) => x !== occ);
-    prime(orig); prime(copy); db.items.push(copy); save();
-    return send(res, 200, { original: orig, created: copy });
-  }
-  const m = p.match(/^\/api\/items\/([\w-]+)$/);
-  if (m) {
-    const i = db.items.findIndex((x) => x.id === m[1]);
-    if (i < 0) return send(res, 404, {});
-    if (req.method === 'PUT') {
-      const patch = await readBody(req);
-      delete patch.attachments; delete patch.source; // files and calendar links change only through their own routes
-      db.items[i] = { ...db.items[i], ...patch, id: m[1] };
-      if (['date', 'time', 'reminders', 'repeat', 'nudges', 'skip', 'repeatUntil', 'endDate'].some((k) => k in patch)) { db.items[i].lastNag = 0; prime(db.items[i]); }
-      save(); return send(res, 200, db.items[i]);
-    }
-    if (req.method === 'DELETE') { const [gone] = db.items.splice(i, 1); if (gone.source) db.ignored = [...db.ignored.slice(-4999), `${gone.source.feed}|${gone.source.key}`]; db.trash.unshift({ ...gone, deletedAt: Date.now() }); db.trash.length = Math.min(db.trash.length, 200); save(); return send(res, 200, db.trash[0]); }
-  }
   // The page's script is assembled from public/js/*.js (see lib/assets.js).
   if (p === '/app.js') { res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache' }); return res.end(assembleApp(path.join(PUBLIC, 'js'))); }
   // static
