@@ -64,7 +64,7 @@ function renderGrid(days) {
     if (t) { const m = now.getHours() * 60 + now.getMinutes(); if (m >= top0 && m <= S.dayEnd * 60) evs += `<div class="nowline" style="top:${((m - top0) / 60) * HH}px"></div>`; }
     cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
   }
-  const gut = Array.from({ length: rows }, (_, i) => `<span style="top:${i * HH + (i ? 0 : 2)}px">${S.dayStart + i}:00</span>`).join('');
+  const gut = Array.from({ length: rows }, (_, i) => `<span style="top:${i * HH + (i ? 0 : 9)}px">${S.dayStart + i}:00</span>`).join('');
   return `<div class="stick"><div class="cols" style="--n:${n}">${head}</div><div class="cols" style="--n:${n}">${due}</div></div><div class="cols" style="--n:${n};--rows:${rows}"><div class="gut">${gut}</div>${cols}</div>`;
 }
 
@@ -92,9 +92,8 @@ function renderCal() {
   box.innerHTML = view === 'month' ? renderMonth() : renderGrid(days);
   document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === view));
   if (view !== 'month' && autoscroll) {
-    const m = new Date().getHours() * 60 + new Date().getMinutes();
-    const to = days.some((d) => ymd(d) === ymd(new Date())) ? Math.max(0, ((m - S.dayStart * 60) / 60) * HH - box.clientHeight * 0.4) : 0;
-    if (calShown) { box.scrollTop = 0; box.scrollTo({ top: to, behavior: 'smooth' }); } else box.scrollTop = to;
+    // Always open at the start of the day (7:00 by default), not at the current time, so a refresh looks the same every time.
+    box.scrollTop = 0;
   } else box.scrollTop = keep;
   if (autoscroll && calShown) { box.style.setProperty('--dir', navDir); box.classList.remove('flip'); void box.offsetWidth; box.classList.add('flip'); }
   calShown = true; navDir = 0;
