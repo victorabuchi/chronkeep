@@ -1,6 +1,8 @@
 // ChronKeep in the cloud: many people, each with their own account, on one server.
 //   node cloud/server.js      (needs DATABASE_URL and SESSION_SECRET, see cloud/README.md)
 // The web app (public/) is served to signed-in people at /app, the phone app talks to /api/sync.
+// Local runs read .env (on Render the settings come from the dashboard instead).
+try { for (const line of require('fs').readFileSync(require('path').join(__dirname, '..', '.env'), 'utf8').split('\n')) { const m = line.match(/^([A-Z_]+)="?(.*?)"?$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2]; } } catch { /* no .env */ }
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
