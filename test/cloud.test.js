@@ -139,6 +139,30 @@ describe('cloud server', { skip }, () => {
     assert.equal((await call('POST', '/api/mobile/login', { body: { email, password: 'correct horse battery' } })).status, 401);
   });
 
+  it('follows a calendar link and refreshes it on its own when it gets old', async () => {
+    const ics = (n) => ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:lecture-1', 'DTSTART:20261020T080000Z', 'DTEND:20261020T094500Z', `SUMMARY:Lecture ${n}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    let n = 1; const cal = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/calendar' }); res.end(ics(n)); });
+    await new Promise((r) => cal.listen(0, '127.0.0.1', r));
+    try {
+      const { token } = await signup(), url = `http://127.0.0.1:${cal.address().port}/c.ics`;
+      const added = await call('POST', '/api/feeds', { token, body: { name: 'Timetable', url, category: 'Study' } });
+      assert.equal(added.status, 200, JSON.stringify(added.data)); assert.equal(added.data.result.created, 1);
+      assert.equal(added.data.feed.host, `127.0.0.1:${cal.address().port}`); assert.equal(added.data.feed.url, undefined, 'the link itself is never sent back');
+      let st = (await call('GET', '/api/state', { token })).data; assert.equal(st.items[0].title, 'Lecture 1'); assert.deepEqual(st.items[0].reminders, [10]);
+      // not due yet: the job leaves it alone
+      const { syncFeedsJob } = require('../cloud/server');
+      n = 2; await syncFeedsJob();
+      assert.equal((await call('GET', '/api/state', { token })).data.items[0].title, 'Lecture 1');
+      // six hours later it is read again, and the change comes through
+      const id = (await call('GET', '/api/me', { token })).data.id, d = require('../cloud/db');
+      const row = (await d.q('select doc from user_data where user_id = $1', [id])).rows[0].doc; row.feeds[0].lastSync = Date.now() - 7 * 3600000;
+      await d.saveDoc(id, row);
+      require('../cloud/server').forgetLive?.(id);
+      assert.ok((await syncFeedsJob()) >= 1);
+      st = (await call('GET', '/api/state', { token })).data; assert.equal(st.items[0].title, 'Lecture 2'); assert.equal(st.items.length, 1);
+    } finally { cal.close(); }
+  });
+
   it('refuses cross-site changes', async () => {
     const res = await fetch(base + '/auth/login', { method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'email=a@b.c&password=x', redirect: 'manual' });
     assert.equal(res.status, 403);

@@ -282,6 +282,29 @@ const handler = async (req, res) => {
   }
 };
 
+// ---- calendar links, kept up to date on their own ----
+// Every 15 minutes, anyone whose calendar link has not been read for 6 hours gets it refreshed (their phone and the
+// web pick the new events up through sync). One link failing never stops the others.
+const FEED_EVERY = 6 * 3600000;
+async function syncFeedsJob() {
+  let rows;
+  try { rows = (await db.q("select user_id from user_data where jsonb_array_length(coalesce(doc->'feeds', '[]'::jsonb)) > 0")).rows; } catch (e) { console.error('Calendar job:', e.message); return 0; }
+  let n = 0;
+  for (const { user_id: userId } of rows) {
+    try {
+      const entry = await docOf(userId);
+      if (!entry) continue;
+      const due = entry.doc.feeds.filter((f) => f.enabled !== false && Date.now() - (f.lastSync || 0) > FEED_EVERY);
+      if (!due.length) continue;
+      let dirty = false;
+      const api = createApi({ getDb: () => entry.doc, setDb: (d) => { d.sync = entry.doc.sync; entry.doc = d; }, save: () => { dirty = true; }, prime: () => {}, files: {}, backups: {} });
+      for (const f of due) { try { await api.syncFeed(f); n++; } catch (e) { console.error(`Calendar "${f.name}" for ${userId}:`, e.message); } }
+      if (dirty) { stamp(entry.doc); await db.saveDoc(userId, entry.doc); }
+    } catch (e) { console.error('Calendar job for', userId, e.message); }
+  }
+  return n;
+}
+
 async function start() {
   await db.connect();
   // 3100 here, so it never clashes with the local Mac app on 3000; Render sets PORT itself
@@ -289,7 +312,8 @@ async function start() {
   const server = http.createServer(handler);
   server.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? `Port ${port} is already in use.` : e.message); process.exit(1); });
   server.listen(port, () => console.log(`ChronKeep cloud: http://localhost:${port}  (sign in at /login)`));
+  if (!process.env.NO_JOBS) { setTimeout(syncFeedsJob, 20000).unref(); setInterval(syncFeedsJob, 15 * 60000).unref(); }
   return server;
 }
 if (require.main === module) start().catch((e) => { console.error(e); process.exit(1); });
-module.exports = { start, handler };
+module.exports = { start, handler, syncFeedsJob, forgetLive: (id) => live.delete(id) };
