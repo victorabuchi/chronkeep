@@ -7,7 +7,8 @@ const os = require('os');
 const { execFile } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const DATA = path.join(__dirname, 'data.json');
+const store = require('./lib/store');
+const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
 const PUBLIC = path.join(__dirname, 'public');
 
 const defaults = () => ({
@@ -52,25 +53,31 @@ const defaults = () => ({
   notepad: { html: '', at: null },
 });
 
-let db = defaults();
-try {
-  const saved = JSON.parse(fs.readFileSync(DATA, 'utf8'));
-  db = { ...db, ...saved, settings: { ...db.settings, ...saved.settings } };
-} catch {}
-// The name used to live in settings; the profile now holds it.
-db.profile = { ...defaults().profile, ...db.profile };
-if (!db.profile.name && db.settings.userName) db.profile.name = db.settings.userName;
-delete db.settings.userName;
-// Settings saved by earlier versions: move to the current palette.
-delete db.settings.headerColor;
-if (db.settings.name === 'My Planner') db.settings.name = 'ChronKeep';
-if (['#7b2d6b', '#6366f1', '#0f7a63'].includes(db.settings.accent)) db.settings.accent = '#3b5bdb';
-const NEW = { Study: '#7c5cf0', Work: '#0e8fb0', Personal: '#d6457a', Health: '#16a36a' };
-const OLD = ['#b57cf0', '#6b8fd1', '#e0709a', '#3fb59c', '#6366f1', '#f59e0b', '#10b981'];
-for (const c of db.settings.categories) if (NEW[c.name] && OLD.includes(c.color)) c.color = NEW[c.name];
-// Older items had a single `remind`.
-for (const it of db.items) if (!Array.isArray(it.reminders)) it.reminders = it.remind != null && it.remind !== '' ? [Number(it.remind)] : [];
-const save = () => fs.writeFileSync(DATA, JSON.stringify(db, null, 2));
+// Turns whatever was saved (possibly by an older version) into the current shape.
+function normalize(saved) {
+  const d = defaults();
+  const out = { ...d, ...saved, settings: { ...d.settings, ...(saved && saved.settings) } };
+  // The name used to live in settings; the profile now holds it.
+  out.profile = { ...d.profile, ...out.profile };
+  if (!out.profile.name && out.settings.userName) out.profile.name = out.settings.userName;
+  delete out.settings.userName;
+  // Settings saved by earlier versions: move to the current palette.
+  delete out.settings.headerColor;
+  if (out.settings.name === 'My Planner') out.settings.name = 'ChronKeep';
+  if (['#7b2d6b', '#6366f1', '#0f7a63'].includes(out.settings.accent)) out.settings.accent = '#3b5bdb';
+  const NEW = { Study: '#7c5cf0', Work: '#0e8fb0', Personal: '#d6457a', Health: '#16a36a' };
+  const OLD = ['#b57cf0', '#6b8fd1', '#e0709a', '#3fb59c', '#6366f1', '#f59e0b', '#10b981'];
+  for (const c of out.settings.categories) if (NEW[c.name] && OLD.includes(c.color)) c.color = NEW[c.name];
+  // Older items had a single `remind`.
+  for (const it of out.items) if (!Array.isArray(it.reminders)) it.reminders = it.remind != null && it.remind !== '' ? [Number(it.remind)] : [];
+  return out;
+}
+
+const loaded = store.load(DATA);
+if (loaded.keptAs) console.error(`data.json was damaged. It was kept as ${path.basename(loaded.keptAs)}${loaded.recoveredFrom ? ` and ${loaded.recoveredFrom} was loaded instead` : ' and no backup could be used, so ChronKeep started empty'}.`);
+let db = normalize(loaded.data || {});
+store.dailyBackup(DATA);
+const save = () => store.save(DATA, db);
 save();
 
 // ---- notifications ----
@@ -219,6 +226,7 @@ function upcoming() {
 
 function tick() {
   const now = new Date();
+  store.dailyBackup(DATA);
   let changed = false;
   const s = db.settings;
 
@@ -324,12 +332,24 @@ http.createServer(async (req, res) => {
   if (p === '/api/account' && req.method === 'DELETE') {
     const want = db.profile.email || 'DELETE';
     if (String((await readBody(req)).confirm || '').trim().toLowerCase() !== want.toLowerCase()) return send(res, 400, { error: 'The confirmation did not match.' });
+    store.backupNow(DATA, 'pre-delete');
     db = defaults(); save();
     return send(res, 200, { ok: true });
   }
   if (p === '/api/settings' && req.method === 'PUT') { db.settings = { ...db.settings, ...(await readBody(req)) }; save(); return send(res, 200, db.settings); }
   if (p === '/api/notepad' && req.method === 'PUT') { db.notepad = { html: String((await readBody(req)).html ?? ''), at: new Date().toISOString() }; save(); return send(res, 200, db.notepad); }
   if (p === '/api/notifications' && req.method === 'GET') return send(res, 200, { history: db.history.slice(0, 50), upcoming: upcoming() });
+  // Backups: daily copies of the data file, kept for two weeks. Restoring keeps a copy of what was there.
+  if (p === '/api/backups' && req.method === 'GET') return send(res, 200, store.list(DATA));
+  if (p === '/api/backups' && req.method === 'POST') { const n = store.backupNow(DATA, `manual-${store.dayStamp()}-${new Date().toTimeString().slice(0, 5).replace(':', '')}`); return send(res, 200, { name: n }); }
+  const bm = p.match(/^\/api\/backups\/([\w.-]+)\/restore$/);
+  if (bm && req.method === 'POST') {
+    const data = store.readBackup(DATA, bm[1]);
+    if (!data || !Array.isArray(data.items)) return send(res, 400, { error: 'That backup could not be read.' });
+    store.backupNow(DATA, `pre-restore-${Date.now()}`);
+    db = normalize(data); save();
+    return send(res, 200, { ok: true });
+  }
   // The bin: deleted items wait here for 30 days and can be put back.
   if (p === '/api/trash' && req.method === 'DELETE') { db.trash = []; save(); return send(res, 200, { ok: true }); }
   const tm = p.match(/^\/api\/trash\/([\w-]+)(\/restore)?$/);

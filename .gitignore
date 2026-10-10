@@ -1,4 +1,7 @@
 data.json
+data.*.json
+backups/
 node_modules/
 .DS_Store
 *.log
+*.tmp

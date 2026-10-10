@@ -117,6 +117,12 @@
             <p class="note">Download everything ChronKeep stores about you (profile, settings, tasks, events and your note) as a JSON file.</p>
             <a class="btn ghost sm" href="/api/export" download>Export my data</a>
           </div>
+          <div class="scard">
+            <strong>Backups</strong>
+            <p class="note">ChronKeep keeps a copy of your data every day for two weeks, and a copy before anything risky. Restoring one first saves what you have now.</p>
+            <div class="blist" id="bList"></div>
+            <div class="frm"><button type="button" class="btn ghost sm" id="bNow">Back up now</button><span class="msg" id="bMsg" role="status"></span></div>
+          </div>
           <form class="scard danger" id="delForm" novalidate>
             <strong>Delete account</strong>
             <p class="note">Erases your profile, settings, tasks, events and note from this computer right away. This cannot be undone. Export your data first if you want a copy.</p>

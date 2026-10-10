@@ -287,7 +287,7 @@ function setPage(p) {
   $('railSet').classList.toggle('on', p === 'customize');
   if (p === 'customize') fillCustomize();
   $('railSettings').classList.toggle('on', p === 'settings');
-  if (p === 'settings') fillProfile();
+  if (p === 'settings') { fillProfile(); loadBackups(); }
   $('tasks').classList.toggle('full', p === 'tasks');
   $('railCal').classList.toggle('on', p === 'cal');
   $('navTasks').classList.toggle('on', p === 'tasks');
@@ -763,6 +763,27 @@ $('delForm').onsubmit = async (e) => {
   try { Object.keys(localStorage).filter((k) => k.startsWith('planner:')).forEach((k) => localStorage.removeItem(k)); } catch {}
   location.reload();
 };
+// Backups
+const backupLabel = (n) => {
+  const m = n.match(/^data-(\d{4}-\d{2}-\d{2})\.json$/);
+  if (m) return `Daily, ${fmtDay(m[1])}`;
+  if (/pre-delete/.test(n)) return 'Before account deletion';
+  if (/pre-restore/.test(n)) return 'Before a restore';
+  const mm = n.match(/^data-manual-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})\.json$/);
+  return mm ? `Manual, ${fmtDay(mm[1])} ${mm[2]}:${mm[3]}` : n;
+};
+async function loadBackups() {
+  const list = await api('GET', '/api/backups');
+  $('bList').innerHTML = list.length ? list.slice(0, 8).map((b) => `<div class="brow"><span><b>${esc(backupLabel(b.name))}</b><small>${Math.max(1, Math.round(b.size / 1024))} KB</small></span><button type="button" class="btn ghost sm" data-restore="${esc(b.name)}">Restore</button></div>`).join('') : '<p class="note">No backups yet.</p>';
+}
+$('bList').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-restore]');
+  if (!b || !confirm('Replace your current data with this backup? What you have now is saved as a backup first.')) return;
+  const r = await fetch(`/api/backups/${encodeURIComponent(b.dataset.restore)}/restore`, { method: 'POST' });
+  if (!r.ok) return flash($('bMsg'), 'That backup could not be restored.', true);
+  location.reload();
+});
+$('bNow').onclick = async () => { await api('POST', '/api/backups'); await loadBackups(); flash($('bMsg'), 'Backed up'); setTimeout(() => flash($('bMsg'), ''), 2500); };
 $('railSettings').onclick = () => setPage('settings');
 $('mKeys').onclick = () => { $('userMenu').hidden = true; $('help').showModal(); };
 $('helpClose').onclick = () => $('help').close();
