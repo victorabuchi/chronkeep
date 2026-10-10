@@ -22,7 +22,7 @@ const head = (title) => `<!doctype html><html lang="en"><head><meta charset="utf
 
 function shell({ title, lede, below, body }) {
   return `${head(title)}<body class="authpage"><div class="auth"><div class="aurora" aria-hidden="true"></div>
-<header class="authhead"><a class="logo" href="/"><span class="tile"><img src="/icon-192.png" alt="" width="36" height="36"></span>ChronKeep</a><h1>${esc(title)}</h1>${lede ? `<p>${esc(lede)}</p>` : ''}</header>
+<header class="authhead"><a class="logo" href="/"><img class="wm" src="/wordmark-light.png" alt="ChronKeep" width="180" height="34"></a><h1>${esc(title)}</h1>${lede ? `<p>${esc(lede)}</p>` : ''}</header>
 <main class="authcard">${body}</main>${below ? `<p class="authswitch">${below}</p>` : ''}</div><script src="/site/auth.js"></script></body></html>`;
 }
 
@@ -63,7 +63,7 @@ function resetPage(token, q = {}) {
 }
 
 function legalPage(title, html) {
-  return `${head(title)}<body class="legal"><header class="legalnav"><a class="logo dark" href="/"><span class="tile"><img src="/icon-192.png" alt="" width="30" height="30"></span>ChronKeep</a><a href="/login">Log in</a></header><main class="legalbody"><h1>${esc(title)}</h1>${html}</main></body></html>`;
+  return `${head(title)}<body class="legal"><header class="legalnav"><a class="logo dark" href="/"><img class="wm" src="/wordmark.png" alt="ChronKeep" width="158" height="30"></a><a href="/login">Log in</a></header><main class="legalbody"><h1>${esc(title)}</h1>${html}</main></body></html>`;
 }
 const PRIVACY = `<p>ChronKeep keeps your calendar, tasks, notes and the files you attach so they are the same on every device you sign in on.</p>
 <h2>What we store</h2><p>Your name and email, a hashed password (or the Google or Apple account id you signed in with), your items, settings, bin, note and attachments, and the calendar links you add. Calendar links can hold private tokens, so they are kept only in your own data and are never shown back in full.</p>

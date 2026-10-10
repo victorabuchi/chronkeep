@@ -171,3 +171,8 @@ footer.foot a:hover { color: #fff; }
 
 .nav [data-guest], .nav [data-member] { display: inline-flex; gap: 10px; align-items: center; }
 .nav [hidden] { display: none !important; }
+
+/* The wordmark logo (a lighter one on the dark pages). */
+.logo .wm { display: block; height: 34px; width: auto; }
+.nav .logo .wm { height: 29px; }
+.logo.dark .wm { height: 30px; }
