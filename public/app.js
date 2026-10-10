@@ -29,7 +29,7 @@ const norm = (x) => ({ ...DEF, ...x, reminderDefaults: { ...DEF.reminderDefaults
 let S = norm({}), items = [], notepad = { html: '', at: null };
 let P = { name: '', email: '', phone: '', photo: '' };
 let trash = [];
-let page = ['tasks', 'settings', 'customize', 'history', 'bin'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true;
+let page = ['tasks', 'settings', 'customize', 'history', 'bin'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true, calShown = false, navDir = 0;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
 const vis = (it) => typeF === 'all' || it.type === typeF;
@@ -51,10 +51,35 @@ const dueAt = (it, d) => { const [h, m] = (it.time || (it.type === 'event' ? '00
 async function toggle(id, dateStr) {
   const it = items.find((x) => x.id === id);
   if (!it) return;
+  const completing = rep(it) ? !(it.doneOn || []).includes(dateStr) : !it.done;
   if (!rep(it)) { it.done = !it.done; it.doneAt = it.done ? Date.now() : null; }
   else { const a = it.doneOn || []; it.doneOn = a.includes(dateStr) ? a.filter((x) => x !== dateStr) : [...a, dateStr]; }
+  const saved = api('PUT', '/api/items/' + id, { done: it.done, doneOn: it.doneOn, doneAt: it.doneAt });
+  if (completing) {
+    const sel = `[data-id="${id}"][data-d="${dateStr}"]`;
+    const marks = document.querySelectorAll(`.trow${sel} .circle, .chip${sel} .tick`);
+    marks.forEach((m) => m.classList.add('on', 'pop'));
+    document.querySelectorAll(`.trow${sel}`).forEach((r) => r.classList.add('done'));
+    if (marks[0]) { const b = marks[0].getBoundingClientRect(); burst(b.left + b.width / 2, b.top + b.height / 2); }
+    toast(`Done: ${it.title}`, 'Undo', () => toggle(id, dateStr));
+    const rows = document.querySelectorAll(`.trow${sel}`);
+    if (rows.length) { await sleep(420); rows.forEach((r) => r.classList.add('leaving')); await sleep(280); }
+  }
   render();
-  await api('PUT', '/api/items/' + id, { done: it.done, doneOn: it.doneOn, doneAt: it.doneAt });
+  await saved;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A small burst of colour from the tick you just pressed.
+function burst(x, y) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cols = [getComputedStyle(document.documentElement).getPropertyValue('--b').trim() || '#3b5bdb', '#f5b400', '#16a36a', '#d6457a', '#0e8fb0'];
+  for (let i = 0; i < 12; i++) {
+    const s = document.createElement('i'); s.className = 'spark';
+    s.style.cssText = `left:${x}px;top:${y}px;background:${cols[i % cols.length]}`;
+    document.body.appendChild(s);
+    const a = (Math.PI * 2 * i) / 12 + Math.random() * 0.5, d = 24 + Math.random() * 30;
+    s.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px),calc(-50% + ${Math.sin(a) * d}px)) scale(.2)`, opacity: 0 }], { duration: 520 + Math.random() * 220, easing: 'cubic-bezier(.15,.8,.3,1)' }).onfinish = () => s.remove();
+  }
 }
 
 // ---------------------------------------------------------------- theme
@@ -160,8 +185,11 @@ function renderCal() {
   document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === view));
   if (view !== 'month' && autoscroll) {
     const m = new Date().getHours() * 60 + new Date().getMinutes();
-    box.scrollTop = days.some((d) => ymd(d) === ymd(new Date())) ? Math.max(0, ((m - S.dayStart * 60) / 60) * HH - box.clientHeight * 0.4) : 0;
+    const to = days.some((d) => ymd(d) === ymd(new Date())) ? Math.max(0, ((m - S.dayStart * 60) / 60) * HH - box.clientHeight * 0.4) : 0;
+    if (calShown) { box.scrollTop = 0; box.scrollTo({ top: to, behavior: 'smooth' }); } else box.scrollTop = to;
   } else box.scrollTop = keep;
+  if (autoscroll && calShown) { box.style.setProperty('--dir', navDir); box.classList.remove('flip'); void box.offsetWidth; box.classList.add('flip'); }
+  calShown = true; navDir = 0;
   autoscroll = false;
 }
 
@@ -264,6 +292,8 @@ function setPage(p) {
   $('railCal').classList.toggle('on', p === 'cal');
   $('navTasks').classList.toggle('on', p === 'tasks');
   if (p === 'cal') { autoscroll = true; renderCal(); }
+  const fresh = { tasks: $('tlist'), history: $('hList'), bin: $('binList') }[p];
+  if (fresh) { fresh.classList.add('fresh'); setTimeout(() => fresh.classList.remove('fresh'), 900); }
 }
 
 // ---------------------------------------------------------------- item form
@@ -398,10 +428,10 @@ $('btnAdd').onclick = () => openForm(null);
 const step = (n) => {
   if (view === 'month') cur = new Date(cur.getFullYear(), cur.getMonth() + n, 1);
   else cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + n * (view === 'week' ? 7 : 1));
-  autoscroll = true; render();
+  navDir = n; autoscroll = true; render();
 };
 $('prev').onclick = () => step(-1); $('next').onclick = () => step(1);
-const goToday = () => { cur = new Date(); autoscroll = true; render(); };
+const goToday = () => { navDir = cur < new Date() ? 1 : -1; cur = new Date(); autoscroll = true; render(); };
 $('todayBtn').onclick = goToday;
 $('viewSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; store('planner:view', view); autoscroll = true; render(); } };
 document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); render(); }));
