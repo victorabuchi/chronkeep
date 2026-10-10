@@ -11,6 +11,7 @@ const store = require('./lib/store');
 const auth = require('./lib/auth');
 const autostart = require('./lib/autostart');
 const ics = require('./lib/ics');
+const desktop = require('./lib/desktop');
 const calsync = require('./lib/calsync');
 const Recur = require('./public/recur.js'); // the page uses the same file, so both agree on which days an item appears
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
@@ -116,7 +117,23 @@ function plainNotify(title, body) {
 }
 // The popup comes from ChronKeep.app (see mac/): our icon, plus Snooze and Done buttons. One at a time.
 // Without it, or if it fails, a plain script notification is used instead.
+// Linux and Windows: a plain desktop notification (Linux also gets Snooze and Done when notify-send supports buttons).
+function otherDesktopNotify(title, body, meta) {
+  try {
+    if (process.platform === 'linux') {
+      const c = desktop.linux(title, body, meta, path.join(__dirname, 'public', 'icon-192.png'));
+      execFile(c.cmd, c.args, { timeout: c.waits ? 600000 : 15000 }, (err, stdout) => {
+        const picked = String(stdout || '').trim();
+        if (c.waits && (picked === 'snooze' || picked === 'done')) applyAction(meta.itemId, meta.date, picked, 10);
+      });
+    } else if (process.platform === 'win32') {
+      const c = desktop.windows(title, body);
+      execFile(c.cmd, c.args, { env: { ...process.env, ...c.env }, timeout: 15000, windowsHide: true }, () => {});
+    }
+  } catch { /* no notifier available: the planner and the phone still work */ }
+}
 function macNotify(title, body, meta = {}) {
+  if (process.platform === 'linux' || process.platform === 'win32') return otherDesktopNotify(title, body, meta);
   if (process.platform !== 'darwin') return;
   macQueue = macQueue.then(async () => {
     if (fs.existsSync(NATIVE)) {
