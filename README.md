@@ -45,16 +45,21 @@ On your phone, Snooze and Done buttons appear when other devices can reach your 
 ## Layout
 
 ```
-server.js        API, scheduler, notifications
-mac/             builds the ChronKeep.app that Mac notifications come from
-public/          the web app (index.html, app.js, app.css, note.js, note.css)
-data.json        your data (created on first run, git-ignored)
+server.js          API, scheduler, notifications
+lib/               store (saves, backups), auth, ics, calsync (calendar links), desktop, autostart, assets
+mac/               builds the ChronKeep.app that Mac notifications come from
+public/            the web app
+  index.html, app.css, login.html
+  js/NNN-name.js   the page's script, one file per section, joined into app.js by the server
+  recur.js, quick.js   rules shared with the tests (which days an item appears, typing a sentence)
+  note.js, note.css    the floating note
+test/              node:test suites (run with `npm test`)
+data.json          your data (git-ignored); backups/ and uploads/ sit next to it
 ```
 
-## Access
+## Development
 
-ChronKeep only listens on this computer. To open it from your phone or another computer on your Wi-Fi, go to **Customize > Other devices**, set a PIN (6 to 12 digits) and switch on "Allow other devices". Other devices must enter the PIN; five wrong tries lock that address out for a minute. Settings can only be changed from the computer ChronKeep runs on.
-
-## Start at login
-
-**Customize > Start with your Mac** installs a macOS launch agent (`~/Library/LaunchAgents`) that starts ChronKeep when you log in and restarts it if it stops. From the terminal: `node lib/autostart.js install`, `uninstall` or `status`. Logs are in `~/Library/Logs/ChronKeep/server.log`.
+No dependencies and no build step. `npm test` runs the suites (about 75 tests, 10 seconds): the calendar and
+recurrence rules, natural-language parsing, storage and recovery, access control, reminders, calendar links,
+attachments and the notification buttons, each against a real server on a spare port with its own temporary data.
+To change the page, edit the section it lives in under `public/js/`.

@@ -12,6 +12,7 @@ const auth = require('./lib/auth');
 const autostart = require('./lib/autostart');
 const ics = require('./lib/ics');
 const desktop = require('./lib/desktop');
+const { assembleApp } = require('./lib/assets');
 const calsync = require('./lib/calsync');
 const Recur = require('./public/recur.js'); // the page uses the same file, so both agree on which days an item appears
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
@@ -133,6 +134,7 @@ function otherDesktopNotify(title, body, meta) {
   } catch { /* no notifier available: the planner and the phone still work */ }
 }
 function macNotify(title, body, meta = {}) {
+  if (process.env.CHRONKEEP_NO_DESKTOP) return;
   if (process.platform === 'linux' || process.platform === 'win32') return otherDesktopNotify(title, body, meta);
   if (process.platform !== 'darwin') return;
   macQueue = macQueue.then(async () => {
@@ -151,7 +153,7 @@ function macNotify(title, body, meta = {}) {
   });
 }
 // Build the notifier app the first time, or upgrade the simple version when a Swift compiler is available.
-if (process.platform === 'darwin' && (!fs.existsSync(NOTIFIER) || (!fs.existsSync(NATIVE) && fs.existsSync('/usr/bin/swiftc')))) {
+if (process.env.CHRONKEEP_NO_DESKTOP) { /* tests: leave the notifier alone */ } else if (process.platform === 'darwin' && (!fs.existsSync(NOTIFIER) || (!fs.existsSync(NATIVE) && fs.existsSync('/usr/bin/swiftc')))) {
   execFile('sh', [path.join(__dirname, 'mac', 'build-notifier.sh')], (e) => { if (e) console.error('Could not build the Mac notifier:', e.message); checkMac(); });
 } else checkMac();
 
@@ -419,7 +421,7 @@ function tick() {
   if (db.notified.length > 4000) db.notified = db.notified.slice(-2000);
   if (changed) save();
 }
-setInterval(tick, 20000);
+setInterval(tick, Number(process.env.CHRONKEEP_TICK_MS) || 20000); // tests run it faster
 tick();
 
 // ---- http ----
@@ -677,6 +679,8 @@ const handler = async (req, res) => {
     }
     if (req.method === 'DELETE') { const [gone] = db.items.splice(i, 1); if (gone.source) db.ignored = [...db.ignored.slice(-4999), `${gone.source.feed}|${gone.source.key}`]; db.trash.unshift({ ...gone, deletedAt: Date.now() }); db.trash.length = Math.min(db.trash.length, 200); save(); return send(res, 200, db.trash[0]); }
   }
+  // The page's script is assembled from public/js/*.js (see lib/assets.js).
+  if (p === '/app.js') { res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache' }); return res.end(assembleApp(path.join(PUBLIC, 'js'))); }
   // static
   const f = path.join(PUBLIC, p === '/' ? 'index.html' : p);
   if (!f.startsWith(PUBLIC) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
