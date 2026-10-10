@@ -52,7 +52,10 @@ $('prev').onclick = () => step(-1); $('next').onclick = () => step(1);
 const goToday = () => { navDir = cur < new Date() ? 1 : -1; cur = new Date(); autoscroll = true; render(); };
 $('todayBtn').onclick = goToday;
 $('viewSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; store('planner:view', view); autoscroll = true; render(); } };
-document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); if (typeF === 'todo' && page === 'cal') setPage('tasks'); /* to-dos get the whole screen, as big cards */ render(); }));
+document.querySelectorAll('[data-typetabs]').forEach((box) => (box.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; typeF = b.dataset.f; document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF)); if (typeF === 'todo' && page === 'cal') setPage('tasks'); /* to-dos get the whole screen, as big cards */
+  // On the Tasks page the type box next to quick add follows the switch (and the other way round, below).
+  if (page === 'tasks' && ['assignment', 'todo', 'event'].includes(typeF)) $('qType').value = typeF;
+  render(); }));
 $('navTasks').onclick = () => setPage('tasks');
 $('railCal').onclick = () => setPage('cal');
 // The logo and name: back to the home page (the calendar, at today); already there, refresh it.
@@ -80,4 +83,12 @@ document.addEventListener('click', (e) => {
   if (!(dlg instanceof HTMLDialogElement) || !dlg.open) return;
   const r = dlg.getBoundingClientRect();
   if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close();
+});
+
+// On the Tasks page, choosing a type in the box next to quick add switches the page to it: Assignment, To-do or Event.
+$('qType').addEventListener('change', () => {
+  if (page !== 'tasks') return;
+  typeF = $('qType').value;
+  document.querySelectorAll('[data-typetabs] button').forEach((x) => (x.dataset.on = x.dataset.f === typeF));
+  render();
 });
