@@ -37,6 +37,8 @@ let macStatus = 'unknown';
 let feeds = [];
 let page = ['tasks', 'settings', 'customize', 'history', 'bin'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true, calShown = false, navDir = 0;
 
+// Text colour for a solid fill: white, or near-black on a light colour.
+const fgOn = (hex) => { const h = String(hex).replace('#', ''), v = h.length === 3 ? h.replace(/./g, '$&$&') : h, n = parseInt(v, 16) || 0, l = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.62 ? '#111827' : '#ffffff'; };
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
 const vis = (it) => typeF === 'all' || it.type === typeF;
 const hm = (t) => t;

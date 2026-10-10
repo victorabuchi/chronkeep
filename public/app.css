@@ -598,3 +598,20 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 
 .erow{cursor:pointer;align-items:center;gap:12px}
 .erow .evbar{flex:none;align-self:stretch;width:4px;border-radius:2px;background:var(--c)}
+
+/* ---- Knewler's card style on the calendar: the flat badge look (solid fill, small corners, no border or shadow) ---- */
+.ev{border:0;border-radius:3px;background:var(--c);color:var(--fg,#fff);padding:4px 7px}
+.ev:hover{box-shadow:none;filter:brightness(.92)}
+.ev .nm{color:inherit}
+.ev .tm,.ev .sb{color:inherit;opacity:.88}
+.ev.cont-up{border-top-left-radius:0;border-top-right-radius:0}
+.ev.cont-down{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.ev.dragging{filter:none;box-shadow:0 12px 24px -10px #0008}
+.ev.ghost{border:1px dashed var(--b);border-radius:3px;background:color-mix(in srgb,var(--b) 14%,var(--card));color:var(--ink)}
+.ev.asg{--c:var(--asg);--fg:#fff;border:0;background:var(--asg);background-image:none}
+.ev.asg .tm{color:#fff;opacity:.95}
+.ev.asg .cnt{background:#fff;color:var(--asg)}
+.ev.asg .tick{border-color:#fff}.ev.asg .tick.on{background:#fff}.ev.asg .tick.on::after{border-color:var(--asg)}
+.ev.asg.late{--c:var(--neg);background:var(--neg);color:#fff}
+.ev.asg.late .cnt{background:#fff;color:var(--neg)}
+.ev.asg.done{opacity:.45}
