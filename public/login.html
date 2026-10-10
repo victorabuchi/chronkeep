@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ChronKeep</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<style>
+:root{color-scheme:light dark;--b:#3b5bdb;--ink:#14181f;--muted:#6b7380;--line:#e3e7ec;--bg:#f5f7fa;--card:#fff}
+@media(prefers-color-scheme:dark){:root{--ink:#e7eaee;--muted:#97a0ab;--line:#262c34;--bg:#0d1015;--card:#151a20}}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+form{width:min(360px,92vw);padding:26px;border:1px solid var(--line);border-radius:16px;background:var(--card);display:grid;gap:12px;box-shadow:0 24px 60px -30px #0006}
+img{width:44px;height:44px;border-radius:12px}h1{margin:4px 0 0;font-size:20px;letter-spacing:-.02em}p{margin:0;color:var(--muted)}
+input{height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:inherit;font:inherit;font-size:18px;letter-spacing:.2em;outline:none}
+input:focus{border-color:var(--b);box-shadow:0 0 0 3px color-mix(in srgb,var(--b) 16%,transparent)}
+button{height:42px;border:0;border-radius:10px;background:var(--b);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.err{color:#dc2626;min-height:1.2em;font-weight:600}
+</style>
+</head>
+<body>
+<form id="f"><img src="icon-192.png" alt=""><h1>ChronKeep</h1><p>Enter your PIN to continue.</p>
+<input id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="PIN" autofocus>
+<div class="err" id="err" role="alert"></div><button>Unlock</button></form>
+<script>
+document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:document.getElementById('pin').value})});
+if(r.ok)location.href='/';else document.getElementById('err').textContent=r.status===429?'Too many tries. Wait a minute.':'That PIN is not right.';};
+</script>
+</body>
+</html>

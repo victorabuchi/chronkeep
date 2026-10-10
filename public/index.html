@@ -188,6 +188,16 @@
           </div>
         </div>
       </div>
+      <div class="sgrid" style="margin-top:14px">
+        <div class="scard" id="secCard">
+          <strong>Other devices</strong>
+          <p class="note" id="secNote"></p>
+          <div class="field">PIN, 6 to 12 digits<div class="hexrow"><input id="secPin" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password" placeholder="Choose a PIN"><button type="button" class="btn ghost sm" id="secSetPin">Set PIN</button></div></div>
+          <label class="chk"><input type="checkbox" id="secLan"> Allow other devices on my network</label>
+          <div class="note" id="secUrls"></div>
+          <div class="frm"><button type="button" class="btn ghost sm" id="secOut">Sign out other devices</button><button type="button" class="btn ghost sm danger" id="secRemove">Remove PIN</button><span class="msg" id="secMsg" role="status"></span></div>
+        </div>
+      </div>
       <div class="savebar"><span class="msg" id="customMsg" role="status"></span><button type="button" class="btn ghost" id="sCancel">Discard changes</button><button type="button" class="btn" id="sSave">Save changes</button></div>
     </section>
   </main>

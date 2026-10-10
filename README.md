@@ -45,3 +45,7 @@ mac/             builds the ChronKeep.app that Mac notifications come from
 public/          the web app (index.html, app.js, app.css, note.js, note.css)
 data.json        your data (created on first run, git-ignored)
 ```
+
+## Access
+
+ChronKeep only listens on this computer. To open it from your phone or another computer on your Wi-Fi, go to **Customize > Other devices**, set a PIN (6 to 12 digits) and switch on "Allow other devices". Other devices must enter the PIN; five wrong tries lock that address out for a minute. Settings can only be changed from the computer ChronKeep runs on.

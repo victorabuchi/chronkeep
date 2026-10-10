@@ -8,6 +8,7 @@ const { execFile } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 const store = require('./lib/store');
+const auth = require('./lib/auth');
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
 const PUBLIC = path.join(__dirname, 'public');
 
@@ -46,6 +47,8 @@ const defaults = () => ({
   profile: { name: '', email: '', phone: '', photo: '' },
   history: [],
   trash: [],
+  // Who may reach the server. Kept out of `settings` so the page never receives the PIN hash.
+  security: { lan: false, pin: null, sessions: [] },
   items: [],
   notified: [],
   lastDigest: '',
@@ -57,6 +60,7 @@ const defaults = () => ({
 function normalize(saved) {
   const d = defaults();
   const out = { ...d, ...saved, settings: { ...d.settings, ...(saved && saved.settings) } };
+  out.security = { ...d.security, ...out.security };
   // The name used to live in settings; the profile now holds it.
   out.profile = { ...d.profile, ...out.profile };
   if (!out.profile.name && out.settings.userName) out.profile.name = out.settings.userName;
@@ -300,10 +304,55 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 const readBody = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
 
-http.createServer(async (req, res) => {
+const tries = auth.limiter();
+const secInfo = () => ({ lan: db.security.lan, hasPin: !!db.security.pin, urls: db.security.lan ? auth.lanUrls(PORT) : [] });
+const handler = async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
-  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile, trash: db.trash });
+  const remote = req.socket.remoteAddress || '', local = auth.isLoopback(remote);
+  // 1. Only expected host names (blocks DNS rebinding from web pages).
+  if (!auth.hostAllowed(req.headers.host, db.security.lan)) { res.writeHead(421); return res.end('Unexpected host'); }
+  // 2. Changes must come from this app's own pages, never from another site.
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin && !auth.sameOrigin(req.headers.origin, req.headers.host)) { res.writeHead(403); return res.end('Cross-site request refused'); }
+  // 3. Other devices need the PIN. This computer does not.
+  const token = auth.cookies(req.headers.cookie).ck;
+  const signedIn = local || (token && db.security.sessions.includes(auth.sha(token)));
+  if (!signedIn) {
+    if (p === '/api/login' && req.method === 'POST') {
+      if (tries.blocked(remote)) return send(res, 429, { error: 'Too many tries' });
+      const { pin } = await readBody(req);
+      if (!db.security.pin || !auth.checkPin(pin, db.security.pin)) { tries.fail(remote); await new Promise((r) => setTimeout(r, 700)); return send(res, 401, { error: 'Wrong PIN' }); }
+      tries.ok(remote);
+      const t = auth.newToken();
+      db.security.sessions = [...db.security.sessions.slice(-19), auth.sha(t)]; save();
+      res.setHeader('Set-Cookie', `ck=${t}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
+      return send(res, 200, { ok: true });
+    }
+    if (['/login.html', '/icon-192.png', '/favicon.ico'].includes(p)) { /* allowed: needed by the sign-in page */ }
+    else if (p.startsWith('/api/')) return send(res, 401, { error: 'Sign in required' });
+    else { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(fs.readFileSync(path.join(PUBLIC, 'login.html'))); }
+  }
+  if (p === '/api/security' && req.method === 'PUT') {
+    if (!local) return send(res, 403, { error: 'Change this from the computer ChronKeep runs on.' });
+    const b = await readBody(req), sec = db.security, wasLan = sec.lan;
+    if ('pin' in b) {
+      if (b.pin === null || b.pin === '') { sec.pin = null; sec.lan = false; }
+      else if (!auth.validPin(b.pin)) return send(res, 400, { error: 'Use 6 to 12 digits for the PIN.' });
+      else sec.pin = auth.hashPin(String(b.pin));
+      sec.sessions = [];
+    }
+    if ('lan' in b) { if (b.lan && !sec.pin) return send(res, 400, { error: 'Set a PIN first.' }); sec.lan = !!b.lan; }
+    if ('signOutOthers' in b) sec.sessions = [];
+    save();
+    if (sec.lan !== wasLan) res.on('finish', () => setImmediate(relisten));
+    return send(res, 200, secInfo());
+  }
+  if (p === '/api/logout' && req.method === 'POST') {
+    if (token) db.security.sessions = db.security.sessions.filter((h) => h !== auth.sha(token)); save();
+    res.setHeader('Set-Cookie', 'ck=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+    return send(res, 200, { ok: true });
+  }
+  if (p === '/api/state' && req.method === 'GET') return send(res, 200, { settings: db.settings, items: db.items, notepad: db.notepad, profile: db.profile, trash: db.trash, security: secInfo() });
   if (p === '/api/profile' && req.method === 'PUT') {
     const b = await readBody(req), next = { ...db.profile };
     if ('name' in b) next.name = String(b.name).trim().slice(0, 80);
@@ -388,7 +437,15 @@ http.createServer(async (req, res) => {
   if (!f.startsWith(PUBLIC) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
   res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
   fs.createReadStream(f).pipe(res);
-}).listen(PORT, '0.0.0.0', () => {
-  console.log(`ChronKeep running: http://localhost:${PORT}`);
-  console.log(`Phone notifications: install the "ntfy" app and subscribe to topic: ${db.settings.ntfyTopic}`);
-});
+};
+const server = http.createServer(handler);
+// Only this computer by default. Other devices on the network get in only when a PIN is set and "other devices" is on.
+const hostNow = () => (db.security.lan && db.security.pin ? '0.0.0.0' : '127.0.0.1');
+function listen() {
+  server.listen(PORT, hostNow(), () => {
+    console.log(`ChronKeep running: http://localhost:${PORT}${db.security.lan ? `  (also on your network: ${auth.lanUrls(PORT).join(', ')})` : '  (this computer only)'}`);
+    console.log(`Phone notifications: install the "ntfy" app and subscribe to topic: ${db.settings.ntfyTopic}`);
+  });
+}
+function relisten() { server.closeAllConnections(); server.close(() => listen()); }
+listen();

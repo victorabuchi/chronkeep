@@ -29,6 +29,7 @@ const norm = (x) => ({ ...DEF, ...x, reminderDefaults: { ...DEF.reminderDefaults
 let S = norm({}), items = [], notepad = { html: '', at: null };
 let P = { name: '', email: '', phone: '', photo: '' };
 let trash = [];
+let sec = { lan: false, hasPin: false, urls: [] };
 let page = ['tasks', 'settings', 'customize', 'history', 'bin'].includes(load('planner:page')) ? load('planner:page') : 'cal', view = load('planner:view') || 'week', cur = new Date(), typeF = 'all', showDone = false, autoscroll = true, calShown = false, navDir = 0;
 
 const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accent }).color;
@@ -356,6 +357,24 @@ function drawCats() {
   $('sCats').querySelectorAll('input').forEach((el) => (el.oninput = () => (cats[el.dataset.i][el.dataset.k] = el.value)));
   $('sCats').querySelectorAll('[data-x]').forEach((el) => (el.onclick = () => { cats.splice(el.dataset.x, 1); drawCats(); }));
 }
+// Who can open ChronKeep: this computer only, or other devices with a PIN.
+function fillSecurity() {
+  $('secLan').checked = sec.lan; $('secLan').disabled = !sec.hasPin; $('secPin').value = ''; $('secPin').placeholder = sec.hasPin ? 'New PIN to change it' : 'Choose a PIN';
+  $('secSetPin').textContent = sec.hasPin ? 'Change PIN' : 'Set PIN'; $('secRemove').hidden = !sec.hasPin; $('secOut').hidden = !sec.lan;
+  $('secNote').textContent = sec.lan ? 'Other devices on your Wi-Fi can open ChronKeep with the PIN. Open one of the addresses below on that device.' : 'ChronKeep can only be opened from this computer. To use it on your phone or another computer on your Wi-Fi, set a PIN and allow other devices.';
+  $('secUrls').innerHTML = sec.lan ? sec.urls.map((u) => `<b>${esc(u)}</b>`).join('<br>') : '';
+}
+async function setSecurity(body, okText) {
+  const r = await fetch('/api/security', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (!r.ok) { flash($('secMsg'), d.error || 'Could not change that.', true); fillSecurity(); return; }
+  sec = d; fillSecurity(); flash($('secMsg'), okText); setTimeout(() => flash($('secMsg'), ''), 3000);
+}
+$('secSetPin').onclick = () => setSecurity({ pin: $('secPin').value }, 'PIN saved');
+$('secLan').onchange = (e) => setSecurity({ lan: e.target.checked }, e.target.checked ? 'Other devices allowed' : 'This computer only');
+$('secOut').onclick = () => setSecurity({ signOutOthers: true }, 'Signed out');
+$('secRemove').onclick = () => { if (confirm('Remove the PIN? Other devices will lose access.')) setSecurity({ pin: null }, 'PIN removed'); };
+
 function fillCustomize() {
   $('sName').value = S.name; $('sAccent').value = S.accent; $('sHex').value = S.accent; $('sHex').classList.remove('bad'); $('sTheme').value = S.theme;
   $('sWeek').value = S.weekStart; $('sDayStart').value = S.dayStart; $('sDayEnd').value = S.dayEnd; $('sWeekend').value = S.showWeekends ? '1' : '0'; $('sDue').value = S.dueTime;
@@ -368,6 +387,7 @@ function fillCustomize() {
   nudgeEditor($('sNudA'), nudA); nudgeEditor($('sNudE'), nudE); nudgeEditor($('sNudT'), nudT);
   cats = S.categories.map((c) => ({ ...c })); drawCats();
   $('customMsg').textContent = '';
+  fillSecurity();
 }
 $('mSettings').onclick = () => { $('userMenu').hidden = true; setPage('customize'); };
 // Type a hex code and the colour loads at once; nothing is saved until Save.
@@ -826,7 +846,7 @@ document.addEventListener('click', (e) => { if (!e.target.closest('.swrap')) $('
 // ---------------------------------------------------------------- start
 (async () => {
   const st = await api('GET', '/api/state');
-  P = { ...P, ...st.profile }; trash = st.trash || []; S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
+  P = { ...P, ...st.profile }; trash = st.trash || []; sec = st.security || sec; S = norm(st.settings); items = st.items; notepad = st.notepad || notepad;
   setPage(page);
   render();
   if (PlannerNote.wasOpen()) { PlannerNote.open(notepad); noteBtn(); }
