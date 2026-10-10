@@ -219,8 +219,9 @@ async function apiRoutes(req, res, url, userId) {
     return send(res, 200, { ...changesSince(entry.doc, since), stale, serverTime: Date.now() });
   }
   if (p === '/api/account' && req.method === 'DELETE') {
-    const want = (user.email || 'DELETE').toLowerCase();
-    if (String((await readBody(req)).confirm || '').trim().toLowerCase() !== want) return send(res, 400, { error: 'The confirmation did not match.' });
+    // the account email, or the email on the profile (which the page asks you to type)
+    const ok = [user.email, entry.doc.profile.email || 'DELETE'].map((x) => String(x).toLowerCase());
+    if (!ok.includes(String((await readBody(req)).confirm || '').trim().toLowerCase())) return send(res, 400, { error: 'The confirmation did not match.' });
     await db.deleteUser(userId); live.delete(userId);
     res.setHeader('Set-Cookie', auth.clearCookie());
     return send(res, 200, { ok: true });
