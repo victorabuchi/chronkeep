@@ -235,7 +235,7 @@ function tick() {
         const fire = at.getTime() - rem * 60000;
         if (now.getTime() >= fire && now.getTime() < at.getTime() + 3600000) {
           const when = `${ymd(d) === ymd(now) ? 'today' : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${item.time ? ' at ' + item.time : ''}`;
-          notify(`${label(item)}: ${item.title}`, `${rem > 0 ? `Due in ${lead(rem)} - ` : 'Due now - '}${when}${item.category ? ' - ' + item.category : ''}`, { kind: 'reminder', itemId: item.id });
+          notify(`${label(item)}: ${item.title}`, `${rem > 0 ? `Due in ${lead(rem)}` : 'Due now'} (${when})${item.category ? ', ' + item.category : ''}`, { kind: 'reminder', itemId: item.id });
           db.notified.push(key); changed = true;
         }
       }

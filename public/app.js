@@ -83,7 +83,7 @@ function title(days) {
   if (view === 'month') return `${MON[cur.getMonth()]} ${cur.getFullYear()}`;
   if (view === 'day') return `${DOWL[cur.getDay()]}, ${MON[cur.getMonth()]} ${cur.getDate()}, ${cur.getFullYear()}`;
   const a = days[0], b = days[days.length - 1];
-  return a.getMonth() === b.getMonth() ? `${MON[a.getMonth()]} ${a.getDate()} – ${b.getDate()}, ${b.getFullYear()}` : `${MON[a.getMonth()].slice(0, 3)} ${a.getDate()} – ${MON[b.getMonth()].slice(0, 3)} ${b.getDate()}, ${b.getFullYear()}`;
+  return a.getMonth() === b.getMonth() ? `${MON[a.getMonth()]} ${a.getDate()} to ${b.getDate()}, ${b.getFullYear()}` : `${MON[a.getMonth()].slice(0, 3)} ${a.getDate()} to ${MON[b.getMonth()].slice(0, 3)} ${b.getDate()}, ${b.getFullYear()}`;
 }
 
 function chip(it, d, month) {
@@ -127,7 +127,7 @@ function renderGrid(days) {
     due += `<div class="due ${t ? 'today' : ''}">${dueList.map((it) => chip(it, d)).join('')}</div>`;
     let evs = lanes(timed).map((ev) => {
       const c = color(ev.it.category), w = 100 / ev.n;
-      return `<div class="ev" data-id="${ev.it.id}" data-d="${ymd(d)}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${ev.it.time}${ev.it.endTime ? ' - ' + ev.it.endTime : ''}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}</div>`;
+      return `<div class="ev" data-id="${ev.it.id}" data-d="${ymd(d)}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${ev.it.time}${ev.it.endTime ? ' to ' + ev.it.endTime : ''}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}</div>`;
     }).join('');
     if (t) { const m = now.getHours() * 60 + now.getMinutes(); if (m >= top0 && m <= S.dayEnd * 60) evs += `<div class="nowline" style="top:${((m - top0) / 60) * HH}px"></div>`; }
     cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
@@ -550,7 +550,7 @@ function groupLabel(ms) {
 function historyRow(r) {
   const it = r.it, c = color(it.category), meta = [`<span class="kind">${KIND[it.type]}</span>`];
   if (it.category) meta.push(`<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>`);
-  if (r.d) meta.push(`<span>${it.type === 'event' ? '' : 'Due '}${DOW[r.d.getDay()]} ${r.d.getDate()} ${MON[r.d.getMonth()].slice(0, 3)}${it.time ? ', ' + it.time + (it.endTime ? ' – ' + it.endTime : '') : ''}</span>`);
+  if (r.d) meta.push(`<span>${it.type === 'event' ? '' : 'Due '}${DOW[r.d.getDay()]} ${r.d.getDate()} ${MON[r.d.getMonth()].slice(0, 3)}${it.time ? ', ' + it.time + (it.endTime ? ' to ' + it.endTime : '') : ''}</span>`);
   let lead;
   if (r.kind === 'done') {
     lead = `<button type="button" class="circle on" data-undo title="Mark as not done" aria-label="Mark as not done"></button>`;
@@ -568,7 +568,7 @@ function renderHistory() {
   const onTime = withData.filter((r) => r.it.doneAt <= dueAt(r.it, r.d).getTime()).length;
   $('hStats').innerHTML = [
     [doneRecent.length, 'Completed in the last 30 days'],
-    [withData.length ? Math.round((onTime / withData.length) * 100) + '%' : '–', 'Assignments finished on time'],
+    [withData.length ? Math.round((onTime / withData.length) * 100) + '%' : 'None yet', 'Assignments finished on time'],
     [all.filter((r) => r.kind === 'past' && r.when >= m30).length, 'Events in the last 30 days'],
   ].map(([n, l]) => `<div class="hstat"><b>${n}</b><span>${l}</span></div>`).join('');
   document.querySelectorAll('#histTabs button').forEach((b) => (b.dataset.on = b.dataset.h === hF));
