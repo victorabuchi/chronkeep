@@ -12,6 +12,7 @@ const auth = require('./lib/auth');
 const autostart = require('./lib/autostart');
 const ics = require('./lib/ics');
 const calsync = require('./lib/calsync');
+const Recur = require('./public/recur.js'); // the page uses the same file, so both agree on which days an item appears
 const DATA = process.env.CHRONKEEP_DATA || path.join(__dirname, 'data.json');
 const PUBLIC = path.join(__dirname, 'public');
 
@@ -197,17 +198,7 @@ function notify(title, body, meta = {}) {
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-function occursOn(item, d) {
-  const start = new Date(item.date + 'T00:00');
-  const day = new Date(ymd(d) + 'T00:00');
-  if (day < start) return false;
-  switch (item.repeat) {
-    case 'daily': return true;
-    case 'weekly': return day.getDay() === start.getDay();
-    case 'monthly': return day.getDate() === start.getDate();
-    default: return ymd(day) === item.date;
-  }
-}
+const occursOn = (item, d) => Recur.occursOn(item, d);
 
 const atOn = (item, d) => {
   const [h, m] = (item.time || `${pad(db.settings.allDayHour)}:00`).split(':').map(Number);
@@ -596,6 +587,20 @@ const handler = async (req, res) => {
     const it = { id: crypto.randomUUID(), type: 'todo', title: '', notes: '', date: '', time: '', endTime: '', location: '', done: false, doneOn: [], reminders: [], nudges: [], repeat: 'none', category: '', ...(await readBody(req)) };
     prime(it); db.items.push(it); save(); return send(res, 200, it);
   }
+  // "Only this one": take a single occurrence out of a repeating series. The series skips that day and a
+  // separate, non-repeating item takes its place, carrying whatever changes were made.
+  const om = p.match(/^\/api\/items\/([\w-]+)\/occurrence$/);
+  if (om && req.method === 'POST') {
+    const orig = db.items.find((x) => x.id === om[1]), b = await readBody(req), occ = String(b.occ || '');
+    if (!orig || !Recur.isRepeat(orig) || !/^\d{4}-\d{2}-\d{2}$/.test(occ)) return send(res, 400, { error: 'That is not a repeating item.' });
+    const ALLOWED = ['type', 'title', 'notes', 'location', 'date', 'time', 'endTime', 'endDate', 'category', 'reminders', 'nudges'];
+    const patch = Object.fromEntries(Object.entries(b.patch || {}).filter(([k]) => ALLOWED.includes(k)));
+    const copy = { ...JSON.parse(JSON.stringify(orig)), id: crypto.randomUUID(), repeat: 'none', repeatUntil: '', skip: [], doneOn: [], done: (orig.doneOn || []).includes(occ), doneAt: null, lastNag: 0, date: occ, ...patch };
+    delete copy.source;
+    orig.skip = [...new Set([...(orig.skip || []), occ])]; orig.doneOn = (orig.doneOn || []).filter((x) => x !== occ);
+    prime(orig); prime(copy); db.items.push(copy); save();
+    return send(res, 200, { original: orig, created: copy });
+  }
   const m = p.match(/^\/api\/items\/([\w-]+)$/);
   if (m) {
     const i = db.items.findIndex((x) => x.id === m[1]);
@@ -603,7 +608,7 @@ const handler = async (req, res) => {
     if (req.method === 'PUT') {
       const patch = await readBody(req);
       db.items[i] = { ...db.items[i], ...patch, id: m[1] };
-      if (['date', 'time', 'reminders', 'repeat', 'nudges'].some((k) => k in patch)) { db.items[i].lastNag = 0; prime(db.items[i]); }
+      if (['date', 'time', 'reminders', 'repeat', 'nudges', 'skip', 'repeatUntil', 'endDate'].some((k) => k in patch)) { db.items[i].lastNag = 0; prime(db.items[i]); }
       save(); return send(res, 200, db.items[i]);
     }
     if (req.method === 'DELETE') { const [gone] = db.items.splice(i, 1); if (gone.source) db.ignored = [...db.ignored.slice(-4999), `${gone.source.feed}|${gone.source.key}`]; db.trash.unshift({ ...gone, deletedAt: Date.now() }); db.trash.length = Math.min(db.trash.length, 200); save(); return send(res, 200, db.trash[0]); }

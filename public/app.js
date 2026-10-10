@@ -38,15 +38,10 @@ const color = (c) => (S.categories.find((x) => x.name === c) || { color: S.accen
 const vis = (it) => typeF === 'all' || it.type === typeF;
 const hm = (t) => t;
 
-function occurs(it, d) {
-  if (!it.date) return false;
-  const s = day(it.date), dd = day(ymd(d));
-  if (dd < s) return false;
-  if (it.repeat === 'daily') return true;
-  if (it.repeat === 'weekly') return dd.getDay() === s.getDay();
-  if (it.repeat === 'monthly') return dd.getDate() === s.getDate();
-  return ymd(dd) === it.date;
-}
+// Which days an item appears on lives in recur.js, shared with the server.
+const occurs = (it, d) => Recur.occursOn(it, d);
+// Events that run over midnight or several days also show on the days after they start.
+const showsOn = (it, d) => (it.type === 'event' ? Recur.startFor(it, d) !== null : occurs(it, d));
 const rep = (it) => it.repeat && it.repeat !== 'none';
 const isDone = (it, d) => (rep(it) ? (it.doneOn || []).includes(ymd(d)) : !!it.done);
 const dueAt = (it, d) => { const [h, m] = (it.time || (it.type === 'event' ? '00:00' : S.dueTime || '23:59')).split(':').map(Number); const x = new Date(d); x.setHours(h, m, 0, 0); return x; };
@@ -115,9 +110,10 @@ function title(days) {
 }
 
 function chip(it, d, month) {
+  const cont = it.type === 'event' && it.time && Recur.startFor(it, d) !== ymd(d);
   const done = isDone(it, d), c = color(it.category), task = it.type !== 'event';
   const late = task && !done && dueAt(it, d) < new Date();
-  return `<div class="chip ${done ? 'done' : ''} ${late ? 'late' : ''}" ${rep(it) ? '' : 'draggable="true"'} data-id="${it.id}" data-d="${ymd(d)}" style="--c:${c}" title="${esc(it.title)}">${task ? `<button type="button" class="tick ${done ? 'on' : ''}" data-tick aria-label="Tick off"></button>` : ''}<span class="nm">${esc(it.title)}</span>${it.time ? `<span class="tm">${it.time}</span>` : ''}</div>`;
+  return `<div class="chip ${done ? 'done' : ''} ${late ? 'late' : ''}" ${rep(it) ? '' : 'draggable="true"'} data-id="${it.id}" data-d="${ymd(d)}" data-occ="${it.type === 'event' ? Recur.startFor(it, d) || ymd(d) : ymd(d)}" style="--c:${c}" title="${esc(it.title)}">${task ? `<button type="button" class="tick ${done ? 'on' : ''}" data-tick aria-label="Tick off"></button>` : ''}<span class="nm">${esc(it.title)}</span>${it.time ? `<span class="tm">${cont ? (Recur.segment(it, d, 0, 1440).last && it.endTime ? 'until ' + it.endTime : 'continues') : it.time}</span>` : ''}</div>`;
 }
 
 // Overlapping events share the column width.
@@ -141,21 +137,20 @@ function renderGrid(days) {
   for (const d of days) {
     const t = ymd(d) === todayS;
     head += `<div class="dhead ${t ? 'today' : ''}"><span class="dw">${DOW[d.getDay()]}</span><span class="dn">${d.getDate()}</span></div>`;
-    const dayItems = items.filter((it) => vis(it) && occurs(it, d));
+    const dayItems = items.filter((it) => vis(it) && showsOn(it, d));
     const timed = [], dueList = [];
     for (const it of dayItems) {
       if (it.type === 'event' && it.time) {
-        const [h, m] = it.time.split(':').map(Number), s = h * 60 + m;
-        const [eh, em] = (it.endTime || '').split(':').map(Number);
-        const e = it.endTime ? Math.max(s + 15, eh * 60 + em) : s + 60;
-        if (e <= top0 || s >= S.dayEnd * 60) dueList.push(it); else timed.push({ it, s: Math.max(s, top0), e: Math.min(e, S.dayEnd * 60) });
+        const sg = Recur.segment(it, d, top0, S.dayEnd * 60), e = sg.first && sg.last ? Math.max(sg.start + 15, sg.end) : sg.end; // a part that ends before the first hour shown goes in the top row
+        if (e <= top0 || sg.start >= S.dayEnd * 60) dueList.push(it); else timed.push({ it, sg, s: Math.max(sg.start, top0), e: Math.min(e, S.dayEnd * 60) });
       } else dueList.push(it);
     }
     dueList.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
     due += `<div class="due ${t ? 'today' : ''}" data-drop="${ymd(d)}">${dueList.map((it) => chip(it, d)).join('')}</div>`;
     let evs = lanes(timed).map((ev) => {
       const c = color(ev.it.category), w = 100 / ev.n;
-      return `<div class="ev" data-id="${ev.it.id}" data-d="${ymd(d)}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${ev.it.time}${ev.it.endTime ? ' to ' + ev.it.endTime : ''}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.location ? `<div class="sb">${esc(ev.it.location)}</div>` : ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}<i class="rz" aria-hidden="true"></i></div>`;
+      const sg = ev.sg, label = sg.first && sg.last ? `${ev.it.time}${ev.it.endTime ? ' to ' + ev.it.endTime : ''}` : sg.first ? `${ev.it.time} and on` : sg.last ? `until ${ev.it.endTime || 'the evening'}` : 'All day';
+      return `<div class="ev ${sg.first ? '' : 'cont-up'} ${sg.last ? '' : 'cont-down'}" data-id="${ev.it.id}" data-d="${ymd(d)}" data-occ="${sg.occ}" data-first="${sg.first ? 1 : 0}" data-last="${sg.last ? 1 : 0}" style="top:${((ev.s - top0) / 60) * HH}px;height:${Math.max(26, ((ev.e - ev.s) / 60) * HH - 2)}px;left:calc(${ev.lane * w}% + 1px);width:calc(${w}% - 3px);--c:${c}"><div class="tm">${label}</div><div class="nm">${esc(ev.it.title)}</div>${ev.it.location ? `<div class="sb">${esc(ev.it.location)}</div>` : ev.it.category ? `<div class="sb">${esc(ev.it.category)}</div>` : ''}<i class="rz" aria-hidden="true"></i></div>`;
     }).join('');
     if (t) { const m = now.getHours() * 60 + now.getMinutes(); if (m >= top0 && m <= S.dayEnd * 60) evs += `<div class="nowline" style="top:${((m - top0) / 60) * HH}px"></div>`; }
     cols += `<div class="daycol ${t ? 'today' : ''}" data-col="${ymd(d)}">${evs}</div>`;
@@ -172,7 +167,7 @@ function renderMonth() {
   for (let i = 0; i < 7; i++) h += `<div class="mh">${DOW[(i + +S.weekStart) % 7]}</div>`;
   for (let i = 0; i < weeks * 7; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    const list = items.filter((it) => vis(it) && occurs(it, d)).sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+    const list = items.filter((it) => vis(it) && showsOn(it, d)).sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
     h += `<div class="mday ${d.getMonth() !== cur.getMonth() ? 'other' : ''} ${ymd(d) === ymd(new Date()) ? 'today' : ''}" data-go="${ymd(d)}"><span class="n">${d.getDate()}</span>${list.slice(0, 4).map((it) => chip(it, d)).join('')}${list.length > 4 ? `<span class="more">+${list.length - 4} more</span>` : ''}</div>`;
   }
   return h + '</div>';
@@ -300,6 +295,7 @@ function setPage(p) {
 }
 
 // ---------------------------------------------------------------- item form
+let fOcc = null, fScope = 'all';
 let editing = null, fType = 'assignment', fRem = [], fNud = [], remTouched = false;
 function chipSet(box, selected, onChange) {
   const draw = () => {
@@ -334,14 +330,40 @@ function openForm(it, preset = {}) {
   fNud = it ? (it.nudges || []).map((r) => ({ ...r })) : [];
   nudgeEditor($('fNud'), fNud, () => (remTouched = true));
   setType(it ? it.type : preset.type || 'assignment', !it);
+  $('fEndDate').value = it?.endDate || ''; $('fUntil').value = it?.repeatUntil || '';
+  fOcc = it && rep(it) && preset.occ ? preset.occ : null;
+  setScope('all'); $('fScope').hidden = !fOcc; $('fScopeNote').hidden = true;
+  syncRepeatUi();
   $('fDel').hidden = !it;
   $('dlg').showModal(); $('fTitle').focus();
 }
 $('fType').onclick = (e) => { const b = e.target.closest('button'); if (b) setType(b.dataset.t, true); };
+// Repeating items: change the whole series, or only the occurrence you clicked.
+const syncRepeatUi = () => { $('fUntilWrap').hidden = $('fRepeat').value === 'none' || fScope === 'this'; $('fRepeatWrap').style.visibility = fScope === 'this' ? 'hidden' : ''; };
+function setScope(s) {
+  fScope = s;
+  document.querySelectorAll('#fScope button').forEach((b) => (b.dataset.on = b.dataset.scope === s));
+  $('fScopeNote').hidden = !(fOcc && s === 'this'); if (fOcc) $('fScopeNote').textContent = `Changes apply only to the occurrence on ${fmtDay(fOcc)}. The rest of the series stays as it is.`;
+  $('fDel').textContent = fOcc ? (s === 'this' ? 'Delete this one' : 'Delete series') : 'Delete';
+  if (fOcc && editing) { $('fDate').value = s === 'this' ? fOcc : editing.date; }
+  syncRepeatUi();
+}
+$('fScope').onclick = (e) => { const b = e.target.closest('button'); if (b) setScope(b.dataset.scope); };
+$('fRepeat').onchange = syncRepeatUi;
 $('form').onsubmit = async () => {
   let time = $('fTime').value;
   if (fType === 'assignment' && $('fDate').value && !time) time = S.dueTime;
-  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', location: fType === 'event' ? $('fLoc').value.trim() : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, notes: $('fNotes').value };
+  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', endDate: fType === 'event' ? $('fEndDate').value : '', location: fType === 'event' ? $('fLoc').value.trim() : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, repeatUntil: $('fRepeat').value === 'none' ? '' : $('fUntil').value, notes: $('fNotes').value };
+  if (body.endDate && body.endDate <= body.date) body.endDate = '';
+  // An end time earlier than the start means it ends the next day.
+  if (fType === 'event' && body.time && body.endTime && !body.endDate && toMin(body.endTime) <= toMin(body.time) && body.date) body.endDate = ymd(new Date(day(body.date).getTime() + 90000000));
+  if (editing && fOcc && fScope === 'this') {
+    const { repeat, repeatUntil, ...patch } = body, it = editing, before = { skip: it.skip || [], doneOn: it.doneOn || [] };
+    const r = await api('POST', `/api/items/${it.id}/occurrence`, { occ: fOcc, patch });
+    Object.assign(it, r.original); items.push(r.created); render();
+    toast(`Changed only ${fmtDay(fOcc)}`, 'Undo', async () => { await api('DELETE', '/api/items/' + r.created.id); await api('DELETE', '/api/trash/' + r.created.id); Object.assign(it, await api('PUT', '/api/items/' + it.id, before)); items = items.filter((x) => x.id !== r.created.id); trash = trash.filter((x) => x.id !== r.created.id); render(); });
+    return;
+  }
   if (editing) Object.assign(editing, await api('PUT', '/api/items/' + editing.id, body));
   else items.push(await api('POST', '/api/items', body));
   render();
@@ -350,6 +372,12 @@ $('fCancel').onclick = () => $('dlg').close();
 $('fDel').onclick = async () => {
   const it = editing;
   $('dlg').close();
+  if (fOcc && fScope === 'this') {
+    const before = it.skip || [];
+    Object.assign(it, await api('PUT', '/api/items/' + it.id, { skip: [...new Set([...before, fOcc])] })); render();
+    const occ = fOcc;
+    return toast(`Removed ${fmtDay(occ)} from "${it.title}"`, 'Undo', async () => { Object.assign(it, await api('PUT', '/api/items/' + it.id, { skip: before })); render(); });
+  }
   await removeItem(it);
 };
 
@@ -489,7 +517,7 @@ $('calscroll').addEventListener('click', (e) => {
   const tick = e.target.closest('[data-tick]');
   const el = e.target.closest('[data-id]');
   if (tick && el) return toggle(el.dataset.id, el.dataset.d);
-  if (el) return openForm(items.find((x) => x.id === el.dataset.id));
+  if (el) return openForm(items.find((x) => x.id === el.dataset.id), { occ: el.dataset.occ || el.dataset.d });
   const col = e.target.closest('[data-col]');
   if (col && e.target === col) {
     const mins = Math.floor(((e.offsetY / HH) * 60 + S.dayStart * 60) / 30) * 30;
@@ -503,7 +531,7 @@ $('tlist').addEventListener('click', (e) => {
   const row = e.target.closest('.trow');
   if (!row) return;
   if (e.target.closest('[data-tick]')) return toggle(row.dataset.id, row.dataset.d);
-  openForm(items.find((x) => x.id === row.dataset.id));
+  openForm(items.find((x) => x.id === row.dataset.id), { occ: row.dataset.d });
 });
 $('quick').onsubmit = async (e) => {
   e.preventDefault();
@@ -621,7 +649,9 @@ function startCreate(e, col) {
 function startEventDrag(e, el) {
   const it = items.find((x) => x.id === el.dataset.id);
   if (!it || !it.time) return;
-  const resize = !!e.target.closest('.rz'), x0 = e.clientX, y0 = e.clientY, s0 = toMin(it.time), dur = it.endTime ? Math.max(15, toMin(it.endTime) - s0) : 60;
+  const resize = !!e.target.closest('.rz'), x0 = e.clientX, y0 = e.clientY, s0 = toMin(it.time), multi = Recur.spanDays(it) > 0, dur = it.endTime && !multi ? Math.max(15, toMin(it.endTime) - s0) : 60;
+  const isFirst = el.dataset.first !== '0', isLast = el.dataset.last !== '0', occ = el.dataset.occ || it.date, k = Math.round((day(el.dataset.d) - day(occ)) / 86400000);
+  if (resize && (!isLast || multi)) return; // long events are resized in the edit form
   const cols = [...document.querySelectorAll('.daycol')], colAt = (x) => cols.find((c) => { const r = c.getBoundingClientRect(); return x >= r.left && x < r.right; });
   let moved = false, nd = el.dataset.d, ns = s0, ne = s0 + dur;
   const label = () => { const t = el.querySelector('.tm'); if (t) t.textContent = `${hhmm(ns)} to ${hhmm(ne)}`; };
@@ -630,17 +660,18 @@ function startEventDrag(e, el) {
     if (!moved) { moved = true; el.classList.add('dragging'); document.body.classList.add('dragging-ev'); }
     const dm = ((ev.clientY - y0) / HH) * 60;
     if (resize) { ne = Math.max(s0 + 15, Math.min(S.dayEnd * 60, snap15(s0 + dur + dm))); el.style.height = `${((ne - s0) / 60) * HH - 2}px`; return label(); }
-    ns = Math.max(S.dayStart * 60, Math.min(S.dayEnd * 60 - 15, snap15(s0 + dm))); ne = ns + dur;
+    if (isFirst) { ns = Math.max(S.dayStart * 60, Math.min(S.dayEnd * 60 - 15, snap15(s0 + dm))); ne = ns + dur; }
     const c = rep(it) ? null : colAt(ev.clientX);
-    if (c) { nd = c.dataset.col; if (el.parentElement !== c) c.appendChild(el); el.style.left = '1px'; el.style.width = 'calc(100% - 3px)'; }
-    el.style.top = `${((ns - S.dayStart * 60) / 60) * HH}px`; label();
+    if (c) { nd = ymd(new Date(day(c.dataset.col).getTime() - k * 86400000 + 3600000)); if (el.parentElement !== c) c.appendChild(el); el.style.left = '1px'; el.style.width = 'calc(100% - 3px)'; }
+    if (isFirst) el.style.top = `${((ns - S.dayStart * 60) / 60) * HH}px`;
+    if (isFirst && !multi) label();
   };
   const up = async () => {
     removeEventListener('pointermove', move); document.body.classList.remove('dragging-ev');
     if (!moved) return;
     endClick(); el.classList.remove('dragging');
-    const before = { date: it.date, time: it.time, endTime: it.endTime || '' }, body = { time: hhmm(ns), endTime: hhmm(ne) };
-    if (!rep(it) && !resize) body.date = nd;
+    const before = { date: it.date, time: it.time, endTime: it.endTime || '', endDate: it.endDate || '' }, body = { time: hhmm(ns), endTime: multi ? (it.endTime || '') : hhmm(ne) };
+    if (!rep(it) && !resize) { body.date = nd; if (it.endDate) body.endDate = ymd(new Date(day(it.endDate).getTime() + (day(nd) - day(it.date)) + 3600000)); }
     if (resize) body.time = it.time;
     if (body.time === before.time && body.endTime === before.endTime && (body.date === undefined || body.date === before.date)) return render();
     Object.assign(it, await api('PUT', '/api/items/' + it.id, body)); render();
@@ -738,13 +769,7 @@ $('railBin').onclick = () => setPage('bin');
 
 // ---------------------------------------------------------------- history: completed and past
 let hF = 'all';
-const endOf = (it, d) => {
-  const x = new Date(d);
-  if (it.endTime) { const [h, m] = it.endTime.split(':').map(Number); x.setHours(h, m, 0, 0); }
-  else if (it.time) { const [h, m] = it.time.split(':').map(Number); x.setHours(h, m + 60, 0, 0); }
-  else x.setHours(23, 59, 59, 0);
-  return x;
-};
+const endOf = (it, d) => Recur.endOf(it, ymd(d));
 function historyRows() {
   const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()), rows = [];
   for (const it of items) {
@@ -813,7 +838,7 @@ $('hList').addEventListener('click', (e) => {
   const row = e.target.closest('.hrow');
   if (!row) return;
   if (e.target.closest('[data-undo]')) return toggle(row.dataset.id, row.dataset.d);
-  openForm(items.find((x) => x.id === row.dataset.id));
+  openForm(items.find((x) => x.id === row.dataset.id), { occ: row.dataset.d });
 });
 $('railHistory').onclick = () => setPage('history');
 

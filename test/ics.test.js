@@ -89,3 +89,10 @@ test('export: events and tasks, escaped, folded and readable again', () => {
   const trip = back.find((e) => e.title === 'Trip');
   assert.deepEqual([trip.date, trip.endDate], ['2026-10-20', '2026-10-22']);
 });
+
+test('export: a repeat with an end date and a skipped day reads back correctly', () => {
+  const text = ics.build([{ id: 'r1', type: 'event', title: 'Gym', date: '2026-10-12', time: '07:00', endTime: '08:00', repeat: 'weekly', repeatUntil: '2026-11-02', skip: ['2026-10-19'], reminders: [] }]);
+  assert.match(text, /RRULE:FREQ=WEEKLY;UNTIL=20261102T235900/);
+  assert.match(text, /EXDATE:20261019T070000/);
+  assert.deepEqual(ics.parse(text, { horizonDays: 900 }).map((e) => e.date), ['2026-10-12', '2026-10-26', '2026-11-02']);
+});

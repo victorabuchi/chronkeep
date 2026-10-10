@@ -226,15 +226,17 @@
 <dialog id="dlg"><form id="form" method="dialog">
   <h3 id="fHead">New</h3>
   <div class="segment wide" id="fType"><button type="button" data-t="assignment">Assignment</button><button type="button" data-t="event">Event</button><button type="button" data-t="todo">To-do</button></div>
+  <div class="segment wide" id="fScope" hidden><button type="button" data-scope="all" data-on="true">Whole series</button><button type="button" data-scope="this">Only this one</button></div>
+  <p class="note" id="fScopeNote" hidden></p>
   <label class="l">Title</label><input id="fTitle" required placeholder="e.g. Web Programming essay">
   <label class="l">Course</label><select id="fCat"></select>
   <div class="two"><div><label class="l" id="fDateL">Due date</label><input type="date" id="fDate"></div><div><label class="l" id="fTimeL">Due time</label><input type="time" id="fTime"></div></div>
-  <div id="fEndWrap" hidden><label class="l">End time</label><input type="time" id="fEnd"></div>
+  <div class="two" id="fEndWrap" hidden><div><label class="l">End time</label><input type="time" id="fEnd"></div><div><label class="l">Ends on (long events)</label><input type="date" id="fEndDate"></div></div>
   <div id="fLocWrap" hidden><label class="l">Location</label><input id="fLoc" maxlength="200" placeholder="Room, building or link"></div>
   <p class="note" id="fSource" hidden></p>
   <label class="l">Remind me once</label><div class="chips" id="fRem"></div>
   <label class="l">Keep reminding me until it is done</label><div id="fNud"></div>
-  <div class="two"><div><label class="l">Repeat</label><select id="fRepeat"><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div></div>
+  <div class="two"><div id="fRepeatWrap"><label class="l">Repeat</label><select id="fRepeat"><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><div id="fUntilWrap" hidden><label class="l">Repeat until (optional)</label><input type="date" id="fUntil"></div></div>
   <label class="l">Notes</label><textarea id="fNotes" rows="2"></textarea>
   <div class="actions"><button type="button" class="btn danger left" id="fDel">Delete</button><button type="button" class="btn ghost" id="fCancel">Cancel</button><button class="btn">Save</button></div>
 </form></dialog>
@@ -254,6 +256,7 @@
   <div class="actions"><button type="button" class="btn" id="helpClose">Got it</button></div>
 </dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="recur.js"></script>
 <script src="quick.js"></script>
 <script src="note.js"></script>
 <script src="app.js"></script>

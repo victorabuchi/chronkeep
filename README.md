@@ -6,6 +6,7 @@ A personal calendar and to-do list that keeps reminding you until the work is do
 
 - **Search:** find any item on any date from the top bar (press `/`).
 - **Type it naturally:** "Robotics report due Sunday 11pm #study" in the sidebar box or the search bar becomes an assignment with the right date, time, course and reminders. Dates like `tomorrow`, `next friday`, `12 oct`, `12.10.`, `in 3 days` and times like `5pm`, `23:59`, `noon` work, and `every monday` makes it repeat.
+- **Repeats done properly:** end a repeat on a date, skip a single day, or change only one occurrence (it becomes its own item). Events can run past midnight or over several days.
 - **Calendar:** month, week and day views, with assignments, events and to-dos in one place.
 - **Tasks page:** everything you owe, grouped as overdue, today, tomorrow, this week and later. Tick items off as you go.
 - **History:** completed assignments and to-dos (with "on time" or "2 h late" badges and an Undo) and past events, with a 30-day summary.
