@@ -89,7 +89,7 @@ function renderTasks() {
   const open = [], doneL = [];
   for (const it of items) {
     // The To-do page is everything still to do (assignments and to-dos), as big cards; the other filters pick one type.
-    if (it.type === 'event' || (typeF !== 'todo' && !vis(it)) || (typeF === 'event')) continue;
+    if (it.type === 'event' || ((typeF !== 'todo' || page !== 'tasks') && !vis(it)) || (typeF === 'event')) continue;
     const d = nextOcc(it);
     if (!rep(it) && it.done) doneL.push([it, d]); else open.push([it, d]);
   }
@@ -103,7 +103,7 @@ function renderTasks() {
     else if (dueAt(it, d) < now) B.Overdue.push(o);
     else { const diff = Math.round((d - today) / 86400000); (diff === 0 ? B.Today : diff === 1 ? B.Tomorrow : diff <= 7 ? B['This week'] : B.Later).push(o); }
   }
-  const cards = typeF === 'todo';
+  const cards = typeF === 'todo' && page === 'tasks';
   $('tlist').classList.toggle('cards', cards);
   let h = '';
   if (cards) {
