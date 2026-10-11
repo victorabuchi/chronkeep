@@ -36,7 +36,7 @@ function taskRow(it, d, group) {
     meta.push(`<span>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${times ? ', ' + times : ''}</span>`);
     if (!done) { const [t, k] = rel(due); meta.push(`<span class="pill ${k}">${t}</span>`); }
   }
-  if (d && !done && (it.nudges || []).length) { const r = activeRule(it, dueAt(it, d), new Date()); if (r) meta.push(`<span class="pill nudge" title="Repeating reminder in force">🔔 every ${everyLabel(r.every)}</span>`); }
+  if (d && !done && (it.nudges || []).length) { const r = activeRule(it, dueAt(it, d), new Date()); if (r) meta.push(`<span class="pill nudge" title="Repeating reminder in force">Every ${everyLabel(r.every)}</span>`); }
   if (it.priority && PRIO[it.priority]) meta.push(`<span class="prio" style="--pc:${PRIO[it.priority][1]}">${PRIO[it.priority][0]}</span>`);
   const subs = it.subtasks || [], sdone = subs.filter((x) => x.done).length;
   if (subs.length) meta.push(`<span class="pill">${sdone}/${subs.length} steps</span>`);
