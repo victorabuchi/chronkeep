@@ -11,7 +11,7 @@ function goCloud(who) {
   $('accountCard').hidden = false; $('accountNote').textContent = `Signed in as ${who.email}.`; $('signOutBtn').onclick = out;
   // The notification switches are for this computer; keep them in the page (the form still fills them) but hide them.
   $('notifCard').hidden = true;
-  $('notifCard').insertAdjacentHTML('afterend', '<div class="scard"><strong>Notifications</strong><p class="note">Reminders arrive on your phone through the ChronKeep app, set up with the repeating-reminder rules above. Install it on your phone and sign in with this account.</p></div>');
+  pushCard();
   const cal = document.querySelector('#calCard .note'); if (cal) cal.textContent = cal.textContent.replace('kept on this computer only', 'kept in your account only');
 }
 (async () => {

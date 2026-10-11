@@ -11,6 +11,7 @@ const db = require('./db');
 const auth = require('./auth');
 const pages = require('./pages');
 const mail = require('./mail');
+const push = require('./push');
 const { createApi, MAX_FILE } = require('../lib/api');
 const { send, readBody, types } = require('../lib/http');
 const { defaults, normalize } = require('../lib/model');
@@ -210,6 +211,19 @@ async function apiRoutes(req, res, url, userId) {
   void doc;
 
   if (p === '/api/logout' && req.method === 'POST') { res.setHeader('Set-Cookie', auth.clearCookie()); return send(res, 200, { ok: true }); }
+  // Browser notifications (see cloud/push.js)
+  if (p === '/api/push/key' && req.method === 'GET') return send(res, 200, { key: (await push.keys()).publicKey });
+  if (p === '/api/push/status' && req.method === 'GET') return send(res, 200, { on: await push.isSubscribed(userId, url.searchParams.get('endpoint') || '') });
+  if (p === '/api/push/subscribe' && req.method === 'POST') {
+    const b = await readBody(req);
+    try { await push.subscribe(userId, b.sub, b.tz, entry.doc); } catch (e) { return send(res, 400, { error: e.message }); }
+    return send(res, 200, { ok: true });
+  }
+  if (p === '/api/push/unsubscribe' && req.method === 'POST') { await push.unsubscribe(userId, String((await readBody(req)).endpoint || '')); return send(res, 200, { ok: true }); }
+  if (p === '/api/push/test' && req.method === 'POST') {
+    const n = await push.sendTo(userId, { title: 'ChronKeep', body: 'Notifications are working on this computer.', tag: 'test', url: '/app' });
+    return send(res, 200, { sent: n });
+  }
   if (p === '/api/me' && req.method === 'GET') return send(res, 200, { id: user.id, email: user.email, name: user.name });
   // Devices send what changed and the revision they last saw; they get back what changed since.
   if (p === '/api/sync' && req.method === 'POST') {
@@ -312,7 +326,11 @@ async function start() {
   const server = http.createServer(handler);
   server.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? `Port ${port} is already in use.` : e.message); process.exit(1); });
   server.listen(port, () => console.log(`ChronKeep cloud: http://localhost:${port}  (sign in at /login)`));
-  if (!process.env.NO_JOBS) { setTimeout(syncFeedsJob, 20000).unref(); setInterval(syncFeedsJob, 15 * 60000).unref(); }
+  if (!process.env.NO_JOBS) {
+    setTimeout(syncFeedsJob, 20000).unref(); setInterval(syncFeedsJob, 15 * 60000).unref();
+    let pushing = false;
+    setInterval(async () => { if (pushing) return; pushing = true; try { await push.job(docOf); } finally { pushing = false; } }, 60000).unref();
+  }
   return server;
 }
 // A stray error somewhere must be logged, not take the whole server (and everyone signed in) down.

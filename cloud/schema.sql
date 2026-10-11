@@ -54,3 +54,22 @@ alter table auth_identities enable row level security;
 alter table user_data enable row level security;
 alter table files enable row level security;
 alter table backups enable row level security;
+
+-- Browser push (the Mac/PC popups): one row per browser that allowed notifications, and what has been sent so far.
+create table if not exists push_subs (
+  user_id uuid not null references users(id) on delete cascade,
+  endpoint text not null,
+  sub jsonb not null,
+  tz text not null default 'UTC',
+  created_at timestamptz not null default now(),
+  primary key (user_id, endpoint)
+);
+create table if not exists push_state (
+  user_id uuid primary key references users(id) on delete cascade,
+  state jsonb not null default '{}'::jsonb
+);
+-- The server's own signing keys for push, made the first time they are needed (so nothing has to be set up by hand).
+create table if not exists server_kv (key text primary key, value text not null);
+alter table push_subs enable row level security;
+alter table push_state enable row level security;
+alter table server_kv enable row level security;
