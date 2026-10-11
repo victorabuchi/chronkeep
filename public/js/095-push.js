@@ -36,6 +36,15 @@ async function pushCard() {
     } catch (e) { toast(e.message || 'Could not change notifications'); }
     finally { on.disabled = false; refresh(); }
   };
-  test.onclick = async () => { const r = await api('POST', '/api/push/test'); toast(r.sent ? 'Test sent' : 'Nothing was sent. Turn notifications off and on again.'); };
+  // The test goes through the server like a real reminder. If the server says it was sent but no popup appears,
+  // the browser or the operating system is hiding it: also try one straight from this page to tell which.
+  test.onclick = async () => {
+    const r = await api('POST', '/api/push/test');
+    if (!r.sent) return toast('Nothing was sent. Turn notifications off and on again.');
+    toast('Sent. No popup? Check the help below.');
+    help.hidden = false;
+    help.innerHTML = 'The server sent it. If nothing appeared: on a Mac open <b>System Settings, Notifications</b>, find your browser (Chrome, Edge, Firefox) and set <b>Allow notifications</b> to on; also turn off <b>Focus</b> / Do Not Disturb. <a href="#" id="pushLocal">Show one from this page</a> to see whether the browser itself can display them.';
+    $('pushLocal').onclick = (e) => { e.preventDefault(); reg.showNotification('ChronKeep', { body: 'Shown straight from this page.', icon: '/icon-192.png' }); };
+  };
   refresh();
 }
