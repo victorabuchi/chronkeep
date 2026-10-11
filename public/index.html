@@ -236,8 +236,8 @@
   <div class="segment wide" id="fScope" hidden><button type="button" data-scope="all" data-on="true">Whole series</button><button type="button" data-scope="this">Only this one</button></div>
   <p class="note" id="fScopeNote" hidden></p>
   <label class="l">Title</label><input id="fTitle" required autocomplete="off" placeholder="e.g. Web Programming essay">
-  <label class="l">Course or subject</label><select id="fCat"></select>
-  <div class="newcat" id="fNewCat" hidden><input type="color" id="fNewColor" value="#7c5cf0" aria-label="Colour"><input id="fNewName" maxlength="40" autocomplete="off" placeholder="Subject name, e.g. Web Programming"><button type="button" class="btn sm" id="fNewAdd">Add</button><button type="button" class="btn ghost sm" id="fNewCancel">Cancel</button></div>
+  <label class="l">Course</label><select id="fCat"></select>
+  <div id="fSubjWrap" hidden><label class="l">Subject</label><input id="fSubj" maxlength="60" autocomplete="off" placeholder="Which subject? e.g. Web Programming"><div class="chips" id="fSubjChips"></div></div>
   <div class="two"><div><label class="l" id="fDateL">Due date</label><input type="date" id="fDate"></div><div><label class="l" id="fTimeL">Due time</label><input type="time" id="fTime"></div></div>
   <div class="two" id="fEndWrap" hidden><div><label class="l">End time</label><input type="time" id="fEnd"></div><div><label class="l">Ends on (long events)</label><input type="date" id="fEndDate"></div></div>
   <div id="fLocWrap" hidden><label class="l">Location</label><input id="fLoc" maxlength="200" placeholder="Room, building or link"></div>

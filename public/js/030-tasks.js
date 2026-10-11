@@ -29,7 +29,7 @@ function taskRow(it, d, group) {
   const done = d ? isDone(it, d) : it.done, c = color(it.category);
   const meta = [];
   meta.push(`<span class="kind">${KIND[it.type]}</span>`);
-  if (it.category) meta.push(`<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}</span>`);
+  if (it.category) meta.push(`<span><i class="dot" style="background:${c}"></i> ${esc(it.category)}${it.subject ? ' · ' + esc(it.subject) : ''}</span>`);
   if (d) {
     const due = dueAt(it, d);
     const times = group && group.length > 1 ? [...new Set(group.map(([x]) => x.time).filter(Boolean))].sort().join(', ') : it.time;

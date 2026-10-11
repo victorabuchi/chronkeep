@@ -616,7 +616,3 @@ body.dragging-ev,body.dragging-ev *{cursor:grabbing!important;user-select:none!i
 .ev.asg.late .cnt{background:#fff;color:var(--neg)}
 .ev.asg.done{opacity:.45}
 
-/* naming a new subject from inside the item form */
-.newcat{display:flex;gap:8px;align-items:center;margin-top:8px}
-.newcat input[type=color]{width:44px;flex:none;padding:2px}
-.newcat input[type=text],.newcat input:not([type]){flex:1;min-width:0}

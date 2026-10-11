@@ -24,8 +24,8 @@ function setType(t, fresh) {
 function openForm(it, preset = {}) {
   editing = it; remTouched = !!it;
   $('fHead').textContent = it ? 'Edit' : 'New';
-  drawFormCats(); $('fNewCat').hidden = true;
-  $('fTitle').value = it?.title || ''; $('fCat').value = it?.category || preset.category || '';
+  $('fCat').innerHTML = '<option value="">None</option>' + S.categories.map((c) => `<option>${esc(c.name)}</option>`).join('');
+  $('fTitle').value = it?.title || ''; $('fCat').value = it?.category || preset.category || ''; $('fSubj').value = it?.subject || ''; drawSubjects();
   $('fDate').value = it ? it.date : preset.date || ymd(cur); $('fTime').value = it ? it.time || '' : preset.time || '';
   $('fEnd').value = it?.endTime || preset.endTime || ''; $('fLoc').value = it?.location || '';
   $('fSource').hidden = !(it && it.source); if (it && it.source) $('fSource').textContent = `From a calendar${feeds.find((f) => f.id === it.source.feed) ? ': ' + feeds.find((f) => f.id === it.source.feed).name : ''}. When that calendar changes, it overwrites the title, time and place here. Your reminders and course stay as you set them.`; $('fRepeat').value = it?.repeat || 'none'; $('fNotes').value = it?.notes || '';
@@ -92,33 +92,22 @@ function setScope(s) {
   if (fOcc && editing) { $('fDate').value = s === 'this' ? fOcc : editing.date; }
   syncRepeatUi();
 }
-// The course list in the form ends with "Add a subject", which opens a small row to name it (and pick its colour).
-const NEW = '__new';
-function drawFormCats() { $('fCat').innerHTML = '<option value="">None</option>' + S.categories.map((c) => `<option>${esc(c.name)}</option>`).join('') + `<option value="${NEW}">+ Add a subject...</option>`; }
-let catBefore = '';
-$('fCat').onfocus = () => (catBefore = $('fCat').value);
-$('fCat').onchange = () => {
-  if ($('fCat').value !== NEW) return;
-  $('fCat').value = catBefore; $('fNewCat').hidden = false; $('fNewName').value = '';
-  const used = new Set(S.categories.map((c) => c.color.toLowerCase())), pick = ['#7c5cf0', '#0ea5a4', '#e8590c', '#d6336c', '#2f9e44', '#1c7ed6', '#f59f00'].find((x) => !used.has(x)) || '#7c5cf0';
-  $('fNewColor').value = pick; $('fNewName').focus();
-};
-$('fNewCancel').onclick = () => ($('fNewCat').hidden = true);
-async function addSubject() {
-  const name = $('fNewName').value.trim();
-  if (!name) return $('fNewName').focus();
-  if (!S.categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) S = norm(await api('PUT', '/api/settings', { categories: [...S.categories, { name, color: $('fNewColor').value }] }));
-  const have = S.categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
-  drawFormCats(); $('fCat').value = have.name; $('fNewCat').hidden = true;
+// Under Study, say which subject it is for. Subjects you used before are offered as one-tap chips.
+const isStudy = () => $('fCat').value.trim().toLowerCase() === 'study';
+function drawSubjects() {
+  $('fSubjWrap').hidden = !isStudy();
+  const used = [...new Set(items.filter((x) => (x.category || '').toLowerCase() === 'study' && x.subject).map((x) => x.subject))].sort((p, q) => p.localeCompare(q)), cur = $('fSubj').value.trim();
+  $('fSubjChips').innerHTML = used.map((n) => `<button type="button" class="${n === cur ? 'on' : ''}" data-s="${esc(n)}">${esc(n)}</button>`).join('');
 }
-$('fNewAdd').onclick = addSubject;
-$('fNewName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSubject(); } };
+$('fCat').onchange = drawSubjects;
+$('fSubj').oninput = drawSubjects;
+$('fSubjChips').onclick = (e) => { const b = e.target.closest('[data-s]'); if (!b) return; $('fSubj').value = $('fSubj').value.trim() === b.dataset.s ? '' : b.dataset.s; drawSubjects(); };
 $('fScope').onclick = (e) => { const b = e.target.closest('button'); if (b) setScope(b.dataset.scope); };
 $('fRepeat').onchange = syncRepeatUi;
 $('form').onsubmit = async () => {
   let time = $('fTime').value;
   if (fType === 'assignment' && $('fDate').value && !time) time = S.dueTime;
-  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', endDate: fType === 'event' ? $('fEndDate').value : '', location: fType === 'event' ? $('fLoc').value.trim() : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, repeatUntil: $('fRepeat').value === 'none' ? '' : $('fUntil').value, notes: $('fNotes').value, priority: fType === 'event' ? '' : fPrio, subtasks: fType === 'event' ? [] : fSubs.filter((x) => x.text.trim()).map((x) => ({ id: x.id, text: x.text.trim(), done: !!x.done })) };
+  const body = { type: fType, title: $('fTitle').value.trim(), category: $('fCat').value, subject: isStudy() ? $('fSubj').value.trim() : '', date: $('fDate').value, time, endTime: fType === 'event' ? $('fEnd').value : '', endDate: fType === 'event' ? $('fEndDate').value : '', location: fType === 'event' ? $('fLoc').value.trim() : '', reminders: [...fRem].sort((a, b) => b - a), nudges: fNud.map((r) => ({ ...r })), repeat: $('fRepeat').value, repeatUntil: $('fRepeat').value === 'none' ? '' : $('fUntil').value, notes: $('fNotes').value, priority: fType === 'event' ? '' : fPrio, subtasks: fType === 'event' ? [] : fSubs.filter((x) => x.text.trim()).map((x) => ({ id: x.id, text: x.text.trim(), done: !!x.done })) };
   if (body.endDate && body.endDate <= body.date) body.endDate = '';
   // An end time earlier than the start means it ends the next day.
   if (fType === 'event' && body.time && body.endTime && !body.endDate && toMin(body.endTime) <= toMin(body.time) && body.date) body.endDate = ymd(new Date(day(body.date).getTime() + 90000000));
